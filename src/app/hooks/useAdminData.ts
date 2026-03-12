@@ -11,7 +11,7 @@ import {
   updateApplication as updateApplicationEndpoint,
   votePoll,
 } from "../api/endpoints";
-import { getPocketBaseState, isPocketBaseEnabled, setPocketBaseState } from "../api/pocketbase";
+
 
 /* ═══════════════════════════════════════════════
    TYPES — shared between admin and public pages
@@ -158,14 +158,6 @@ export function usePolls() {
   const [polls, setPollsState] = useState<Poll[]>(() => load("polls", []));
 
   useEffect(() => {
-    if (isPocketBaseEnabled()) {
-      void getPocketBaseState<Poll[]>("polls").then((pbPolls) => {
-        if (!pbPolls) return;
-        setPollsState(pbPolls);
-        save("polls", pbPolls);
-      });
-    }
-
     void listPolls<Poll>().then((remotePolls) => {
       if (!remotePolls) return;
       setPollsState(remotePolls);
@@ -177,7 +169,6 @@ export function usePolls() {
     setPollsState(p);
     save("polls", p);
     void putPolls(p);
-    void setPocketBaseState("polls", p);
   };
 
   const addPoll = (poll: Omit<Poll, "id" | "createdAt" | "closedAt">) => {
@@ -205,12 +196,6 @@ export function usePolls() {
     setPolls(polls.filter((p) => p.id !== id));
     // Also clean up voters
     localStorage.removeItem(`schwarz_admin_poll_voters_${id}`);
-    void getPocketBaseState<Record<string, string[]>>("poll_voters").then((map) => {
-      if (!map) return;
-      const updated = { ...map };
-      delete updated[id];
-      void setPocketBaseState("poll_voters", updated);
-    });
   };
 
   return { polls, setPolls, addPoll, togglePoll, deletePoll };
@@ -239,14 +224,6 @@ export function voteOnPoll(pollId: string, optionId: string, voterId: string): b
   });
   save("polls", updated);
   void votePoll({ pollId, optionId, voterId });
-  void setPocketBaseState("polls", updated);
-  const votersMap = load<Record<string, string[]>>("poll_voters", {});
-  const nextVotersMap = {
-    ...votersMap,
-    [pollId]: [...(votersMap[pollId] ?? []), voterId],
-  };
-  save("poll_voters", nextVotersMap);
-  void setPocketBaseState("poll_voters", nextVotersMap);
   return true;
 }
 
@@ -270,8 +247,6 @@ export const defaultNavItems: NavItem[] = [
   { id: "redux", label: "Редукс", path: "/redux", visible: true },
   { id: "rules", label: "Правила", path: "/rules", visible: true },
   { id: "how-to-play", label: "Как играть?", path: "/how-to-play", visible: true },
-  { id: "join", label: "В семью", path: "/join", visible: true },
-  { id: "polls", label: "Голосования", path: "/polls", visible: true },
   { id: "contacts", label: "Контакты", path: "/contacts", visible: true },
 ];
 
@@ -300,11 +275,6 @@ function syncAdminPartial(snapshot: {
   members?: AdminMember[];
 }) {
   void putAdminSnapshot(snapshot);
-  if (snapshot.navItems) void setPocketBaseState("navItems", snapshot.navItems);
-  if (snapshot.announcements) void setPocketBaseState("announcements", snapshot.announcements);
-  if (snapshot.customPages) void setPocketBaseState("customPages", snapshot.customPages);
-  if (snapshot.pageOverrides) void setPocketBaseState("pageOverrides", snapshot.pageOverrides);
-  if (snapshot.members) void setPocketBaseState("members", snapshot.members);
 }
 
 /* ═══════════════════════════════════════════════
@@ -334,37 +304,6 @@ export function useAdminData() {
   }, []);
 
   useEffect(() => {
-    if (isPocketBaseEnabled()) {
-      void Promise.all([
-        getPocketBaseState<NavItem[]>("navItems"),
-        getPocketBaseState<Announcement[]>("announcements"),
-        getPocketBaseState<CustomPage[]>("customPages"),
-        getPocketBaseState<PageOverride[]>("pageOverrides"),
-        getPocketBaseState<AdminMember[]>("members"),
-      ]).then(([nav, announcementsData, customPagesData, pageOverridesData, membersData]) => {
-        if (nav) {
-          setNavItems(nav);
-          save("navItems", nav);
-        }
-        if (announcementsData) {
-          setAnnouncements(announcementsData);
-          save("announcements", announcementsData);
-        }
-        if (customPagesData) {
-          setCustomPages(customPagesData);
-          save("customPages", customPagesData);
-        }
-        if (pageOverridesData) {
-          setPageOverrides(pageOverridesData);
-          save("pageOverrides", pageOverridesData);
-        }
-        if (membersData) {
-          setMembers(membersData);
-          save("members", membersData);
-        }
-      });
-    }
-
     void getAdminSnapshot().then((snapshot) => {
       if (!snapshot) return;
 
@@ -498,7 +437,6 @@ export function submitApplication(app: Omit<Application, "id" | "status" | "admi
   applications.unshift(newApp);
   save("applications", applications);
   void createApplication(newApp);
-  void setPocketBaseState("applications", applications);
   return newApp;
 }
 
@@ -506,14 +444,6 @@ export function useApplications() {
   const [applications, setApplicationsState] = useState<Application[]>(() => load("applications", []));
 
   useEffect(() => {
-    if (isPocketBaseEnabled()) {
-      void getPocketBaseState<Application[]>("applications").then((pbApps) => {
-        if (!pbApps) return;
-        setApplicationsState(pbApps);
-        save("applications", pbApps);
-      });
-    }
-
     void listApplications<Application>().then((remoteApps) => {
       if (!remoteApps) return;
       setApplicationsState(remoteApps);
@@ -525,7 +455,6 @@ export function useApplications() {
     setApplicationsState(apps);
     save("applications", apps);
     void putApplications(apps);
-    void setPocketBaseState("applications", apps);
   };
 
   const updateApplication = (id: string, updates: Partial<Application>) => {

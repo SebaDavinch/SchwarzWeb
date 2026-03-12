@@ -79,7 +79,7 @@ const leaderships: Leadership[] = [
     id: "fib-1",
     name: "FIB",
     fullName: "Federal Investigation Bureau",
-    leader: "Roman (Борщ) Schwarz",
+    leader: "Roman Schwarz",
     period: "18.12.2024 — 18.01.2025",
     server: "Harmony",
     color: "#f59e0b",
@@ -92,14 +92,14 @@ const leaderships: Leadership[] = [
     hideScreenshot: true,
     video: null,
     shortDesc:
-      "Roman (Борщ) Schwarz стал первым директором FIB из Schwarz. Тот же человек, что позже вернётся в FIB как Akihiro.",
+      "Roman Schwarz стал первым директором FIB из Schwarz. Тот же человек, что позже вернётся в FIB как Akihiro.",
     fullDesc: [
-      "Roman (Борщ) Schwarz возглавил Федеральное Бюро Расследований на Harmony. Это был первый опыт семьи в управлении федеральной структурой.",
+      "Roman Schwarz возглавил Федеральное Бюро Расследований на Harmony. Это был первый опыт семьи в управлении федеральной структурой.",
       "За месяц на посту был выстроен фундамент для работы FIB, налажены процессы и фракция передана в стабильном состоянии. Срок был коротким, но результативным.",
-      "Важно: Борщ и Akihiro — это один и тот же человек. Позже он вернулся в FIB уже под именем Akihiro и провёл там полноценный второй срок.",
+      "Важно: Roman и Akihiro — это один и тот же человек. Позже он вернулся в FIB уже под именем Akihiro и провёл там полноценный второй срок.",
     ],
     stats: [
-      { label: "Лидер", value: "Борщ" },
+      { label: "Лидер", value: "Roman" },
       { label: "Фракция", value: "FIB" },
       { label: "Сервер", value: "Harmony" },
     ],

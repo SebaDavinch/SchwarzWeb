@@ -21,7 +21,6 @@ import {
 import { submitApplication } from "../hooks/useAdminData";
 import { notifyNewApplication } from "../hooks/useDiscordWebhook";
 import { GlitchText } from "../components/GlitchText";
-import { getPocketBaseState, isPocketBaseEnabled } from "../api/pocketbase";
 import { EditablePageSection } from "../components/EditablePageSection";
 
 /* ═══════════════════════════════════════════════
@@ -46,20 +45,9 @@ function StatusTracker() {
   const handleTrack = async () => {
     if (!trackId.trim()) return;
     try {
-      let apps: any[] = [];
-
-      if (isPocketBaseEnabled()) {
-        const pbApps = await getPocketBaseState<any[]>("applications");
-        if (pbApps) {
-          apps = pbApps;
-        }
-      }
-
-      if (apps.length === 0) {
-        apps = JSON.parse(
-          localStorage.getItem("schwarz_admin_applications") || "[]"
-        );
-      }
+      const apps: any[] = JSON.parse(
+        localStorage.getItem("schwarz_admin_applications") || "[]"
+      );
 
       const found = apps.find((a: any) => a.id === trackId.trim());
       if (found) {

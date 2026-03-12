@@ -9,13 +9,7 @@ import {
   Clock,
   AlertTriangle,
 } from "lucide-react";
-import {
-  type Poll,
-  type PollOption,
-  voteOnPoll,
-  hasVoted,
-} from "../hooks/useAdminData";
-import { getPocketBaseState, isPocketBaseEnabled } from "../api/pocketbase";
+import { type Poll, type PollOption, voteOnPoll, hasVoted } from "../hooks/useAdminData";
 import { GlitchText } from "../components/GlitchText";
 import { EditablePageSection } from "../components/EditablePageSection";
 import {
@@ -49,13 +43,6 @@ function loadPolls(): Poll[] {
 }
 
 async function loadPollsFromSources(): Promise<Poll[]> {
-  if (isPocketBaseEnabled()) {
-    const pbPolls = await getPocketBaseState<Poll[]>("polls");
-    if (pbPolls) {
-      localStorage.setItem("schwarz_admin_polls", JSON.stringify(pbPolls));
-      return pbPolls;
-    }
-  }
   return loadPolls();
 }
 

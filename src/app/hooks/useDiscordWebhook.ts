@@ -1,5 +1,4 @@
 import { postDiscordWebhookEvent } from "../api/endpoints";
-import { isPocketBaseEnabled, setPocketBaseState } from "../api/pocketbase";
 
 /* ═══════════════════════════════════════════════
    DISCORD WEBHOOK — уведомления в Discord
@@ -42,9 +41,6 @@ export function getWebhookConfig(): WebhookConfig {
 
 export function saveWebhookConfig(config: WebhookConfig) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-  if (isPocketBaseEnabled()) {
-    void setPocketBaseState("discordWebhook", config);
-  }
 }
 
 export function getWebhookEvents(): WebhookEvents {
@@ -58,9 +54,6 @@ export function getWebhookEvents(): WebhookEvents {
 
 export function saveWebhookEvents(events: WebhookEvents) {
   localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
-  if (isPocketBaseEnabled()) {
-    void setPocketBaseState("discordWebhookEvents", events);
-  }
 }
 
 /* ═══════════════════════════════════════════════

@@ -87,3 +87,60 @@ export async function postDiscordWebhookEvent(payload: WebhookEventPayload) {
     body: JSON.stringify(payload),
   });
 }
+
+/* ─── Auth / Staff Accounts ─── */
+
+export interface StaffAccountResponse {
+  id: string;
+  username: string;
+  displayName: string;
+  position: string;
+  permissions: string[];
+  isRoot: boolean;
+  active: boolean;
+  createdAt: string;
+}
+
+export async function loginAdmin(username: string, password: string) {
+  return requestJson<{ ok: boolean; account: StaffAccountResponse }>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+export async function listAdminAccounts() {
+  return requestJson<StaffAccountResponse[]>("/auth/accounts", { method: "GET" });
+}
+
+export async function createAdminAccount(payload: {
+  username: string;
+  password: string;
+  displayName?: string;
+  position?: string;
+  permissions?: string[];
+}) {
+  return requestJson<{ ok: boolean; account: StaffAccountResponse }>("/auth/accounts", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminAccount(
+  id: string,
+  payload: {
+    password?: string;
+    displayName?: string;
+    position?: string;
+    permissions?: string[];
+    active?: boolean;
+  },
+) {
+  return requestJson<{ ok: boolean; account: StaffAccountResponse }>(`/auth/accounts/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAdminAccount(id: string) {
+  return requestVoid(`/auth/accounts/${id}`, { method: "DELETE" });
+}

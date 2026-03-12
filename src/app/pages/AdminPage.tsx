@@ -39,23 +39,21 @@ import {
   ToggleLeft,
   ToggleRight,
   Vote,
+  KeyRound,
+  RefreshCw,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useAdminDataWritable, useApplications, addAuditLog, type AuditLogEntry } from "../hooks/useAdminData";
 import {
-  clearPocketBaseStateByPrefix,
-  getPocketBaseState,
-  getPocketBaseAuthStaffId,
-  hasPocketBaseAuth,
-  isPocketBaseEnabled,
-  listPocketBaseStaff,
-  listPocketBaseUsers,
-  loginPocketBaseAdmin,
-  logoutPocketBaseAdmin,
-  setPocketBaseState,
-  syncPocketBaseStaff,
-  syncPocketBaseUsers,
-} from "../api/pocketbase";
+  putAdminSnapshot,
+  getAdminSnapshot,
+  loginAdmin,
+  listAdminAccounts,
+  createAdminAccount,
+  updateAdminAccount,
+  deleteAdminAccount,
+  type StaffAccountResponse,
+} from "../api/endpoints";
 import { NavbarEditor } from "../components/admin/NavbarEditor";
 import { PagesEditor } from "../components/admin/PagesEditor";
 import { ApplicationsTab } from "../components/admin/ApplicationsTab";
@@ -89,7 +87,8 @@ type Tab =
   | "navbar"
   | "settings"
   | "polls"
-  | "auditlog";
+  | "auditlog"
+  | "accounts";
 
 /* Permission-to-tab mapping */
 const tabPermissions: Record<Tab, string | null> = {
@@ -104,6 +103,7 @@ const tabPermissions: Record<Tab, string | null> = {
   navbar: "manage_settings",
   polls: "manage_settings",
   auditlog: "manage_settings",
+  accounts: "all",
 };
 
 interface Member {
@@ -159,8 +159,6 @@ interface StaffMember {
 /* ═══════════════════════════════════════════════
    INITIAL DATA
    ═══════════════════════════════════════════════ */
-
-const ADMIN_PASSWORD = "schwarz2026";
 
 const defaultMembers: Member[] = [
   { id: "1", name: "Madara Schwarz", role: "owner", joinDate: "2024-01-01", active: true, badges: ["streamer", "fib", "leader"] },
@@ -254,9 +252,6 @@ function loadState<T>(key: string, fallback: T): T {
 
 function saveState<T>(key: string, data: T) {
   localStorage.setItem(`schwarz_admin_${key}`, JSON.stringify(data));
-  if (isPocketBaseEnabled()) {
-    void setPocketBaseState(key, data);
-  }
 }
 
 const roleLabels: Record<Member["role"], string> = {
@@ -333,42 +328,30 @@ function generateId() {
 
 function LoginScreen({
   onLogin,
-  pocketBaseEnabled,
 }: {
-  onLogin: (staffId?: string) => void;
-  pocketBaseEnabled: boolean;
+  onLogin: (account: StaffAccountResponse) => void;
 }) {
-  const [identity, setIdentity] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const [shake, setShake] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username.trim() || !password) return;
     setLoading(true);
+    setErrorMsg("");
 
-    if (pocketBaseEnabled && identity.trim()) {
-      try {
-        const staffId = await loginPocketBaseAdmin(identity.trim(), password);
-        if (staffId) {
-          sessionStorage.setItem("schwarz_admin_auth", "1");
-          onLogin(staffId);
-          return;
-        }
-      } catch {
-      }
-    }
-
-    if (password === ADMIN_PASSWORD) {
-      sessionStorage.setItem("schwarz_admin_auth", "1");
-      onLogin();
+    const result = await loginAdmin(username.trim(), password);
+    if (result?.ok && result.account) {
+      onLogin(result.account);
     } else {
-      setError(true);
+      const msg = result === null ? "Сервер недоступен. Запустите npm run api" : "Неверный логин или пароль";
+      setErrorMsg(msg);
       setShake(true);
       setTimeout(() => setShake(false), 600);
-      setTimeout(() => setError(false), 3000);
     }
 
     setLoading(false);
@@ -376,7 +359,6 @@ function LoginScreen({
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center px-4">
-      {/* Background effects */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#9b2335]/3 blur-[200px] rounded-full pointer-events-none" />
 
       <motion.div
@@ -385,7 +367,6 @@ function LoginScreen({
         transition={{ duration: 0.6 }}
         className="w-full max-w-sm relative"
       >
-        {/* Logo */}
         <div className="text-center mb-10">
           <h1
             className="font-['Russo_One'] text-[#9b2335]"
@@ -401,7 +382,6 @@ function LoginScreen({
           </p>
         </div>
 
-        {/* Login card */}
         <motion.div
           animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
           transition={{ duration: 0.4 }}
@@ -416,33 +396,31 @@ function LoginScreen({
                 Авторизация
               </p>
               <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.7rem" }}>
-                {pocketBaseEnabled ? "Войдите через PocketBase или пароль администратора" : "Введите пароль администратора"}
+                Введите логин и пароль
               </p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit}>
-            {pocketBaseEnabled && (
-              <div className="relative mb-4">
-                <input
-                  type="text"
-                  value={identity}
-                  onChange={(e) => setIdentity(e.target.value)}
-                  placeholder="Email или username (PocketBase)"
-                  className="w-full bg-[#0d0d15] border border-white/8 focus:border-[#9b2335]/30 text-white/80 font-['Oswald'] tracking-wide px-4 py-3 outline-none transition-colors duration-300"
-                  style={{ fontSize: "0.8rem" }}
-                />
-              </div>
-            )}
-            <div className="relative mb-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Логин"
+              autoFocus
+              autoComplete="username"
+              className="w-full bg-[#0d0d15] border border-white/8 focus:border-[#9b2335]/30 text-white/80 font-['Oswald'] tracking-wide px-4 py-3 outline-none transition-colors duration-300"
+              style={{ fontSize: "0.85rem" }}
+            />
+            <div className="relative">
               <input
                 type={showPass ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Пароль"
+                autoComplete="current-password"
                 className="w-full bg-[#0d0d15] border border-white/8 focus:border-[#9b2335]/30 text-white/80 font-['Oswald'] tracking-wide px-4 py-3 pr-12 outline-none transition-colors duration-300"
                 style={{ fontSize: "0.85rem" }}
-                autoFocus
               />
               <button
                 type="button"
@@ -454,23 +432,23 @@ function LoginScreen({
             </div>
 
             <AnimatePresence>
-              {error && (
+              {errorMsg && (
                 <motion.p
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="font-['Oswald'] text-[#ff3366]/60 tracking-wide mb-4"
-                  style={{ fontSize: "0.75rem" }}
+                  className="font-['Oswald'] text-[#ff3366]/60 tracking-wide"
+                  style={{ fontSize: "0.72rem" }}
                 >
-                  Неверный пароль
+                  {errorMsg}
                 </motion.p>
               )}
             </AnimatePresence>
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full font-['Oswald'] uppercase tracking-[0.2em] text-white bg-[#9b2335] hover:bg-[#b52a40] py-3 transition-all duration-300 hover:shadow-[0_0_30px_rgba(155,35,53,0.2)]"
+              disabled={loading || !username.trim() || !password}
+              className="w-full font-['Oswald'] uppercase tracking-[0.2em] text-white bg-[#9b2335] hover:bg-[#b52a40] py-3 transition-all duration-300 hover:shadow-[0_0_30px_rgba(155,35,53,0.2)] disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ fontSize: "0.8rem" }}
             >
               {loading ? "Проверка..." : "Войти"}
@@ -502,6 +480,7 @@ const sidebarItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] =
   { id: "polls", label: "Голосования", icon: Vote },
   { id: "auditlog", label: "Аудит-лог", icon: ClipboardList },
   { id: "settings", label: "Настройки", icon: Settings },
+  { id: "accounts", label: "Аккаунты", icon: KeyRound },
 ];
 
 function Sidebar({
@@ -598,7 +577,7 @@ function Sidebar({
           <LogOut size={16} strokeWidth={1.5} className="shrink-0" />
           {!collapsed && (
             <span className="font-['Oswald'] uppercase tracking-wider" style={{ fontSize: "0.68rem" }}>
-              Вы��ти
+              Выйти
             </span>
           )}
         </button>
@@ -2359,26 +2338,6 @@ function SettingsTab() {
   const [testingWh, setTestingWh] = useState(false);
   const [testResult, setTestResult] = useState<null | boolean>(null);
 
-  useEffect(() => {
-    if (!isPocketBaseEnabled()) return;
-
-    void Promise.all([
-      getPocketBaseState<string>("promoCode"),
-      getPocketBaseState<string>("promoReward"),
-      getPocketBaseState<string>("discordLink"),
-      getPocketBaseState<string>("twitchLink"),
-      getPocketBaseState<WebhookConfig>("discordWebhook"),
-      getPocketBaseState<WebhookEvents>("discordWebhookEvents"),
-    ]).then(([promoCodeState, promoRewardState, discordLinkState, twitchLinkState, webhookConfigState, webhookEventsState]) => {
-      if (promoCodeState) setPromoCode(promoCodeState);
-      if (promoRewardState) setPromoReward(promoRewardState);
-      if (discordLinkState) setDiscordLink(discordLinkState);
-      if (twitchLinkState) setTwitchLink(twitchLinkState);
-      if (webhookConfigState) setWhConfig(webhookConfigState);
-      if (webhookEventsState) setWhEvents(webhookEventsState);
-    });
-  }, []);
-
   const handleSave = () => {
     saveState("promoCode", promoCode);
     saveState("promoReward", promoReward);
@@ -2386,10 +2345,6 @@ function SettingsTab() {
     saveState("twitchLink", twitchLink);
     saveWebhookConfig(whConfig);
     saveWebhookEvents(whEvents);
-    if (isPocketBaseEnabled()) {
-      void setPocketBaseState("discordWebhook", whConfig);
-      void setPocketBaseState("discordWebhookEvents", whEvents);
-    }
     addAuditLog("Настройки обновлены", "settings", "Промокод, ссылки, вебхуки");
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -2401,9 +2356,6 @@ function SettingsTab() {
       Object.keys(localStorage)
         .filter((k) => k.startsWith("schwarz_admin_"))
         .forEach((k) => localStorage.removeItem(k));
-      if (isPocketBaseEnabled()) {
-        void clearPocketBaseStateByPrefix("");
-      }
       window.location.reload();
     }
   };
@@ -2616,7 +2568,7 @@ function SettingsTab() {
         <div className="border border-white/5 bg-white/[0.01] p-5 flex items-start gap-3">
           <AlertTriangle size={16} className="text-[#f59e0b]/30 shrink-0 mt-0.5" />
           <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.72rem", lineHeight: 1.8 }}>
-            Данные синхронизируются через PocketBase (если он настроен), а localStorage используется как резервный кэш в браузере.
+            Данные сохраняются на backend сервере и кэшируются через localStorage в браузере.
           </p>
         </div>
       </div>
@@ -2625,72 +2577,293 @@ function SettingsTab() {
 }
 
 /* ═══════════════════════════════════════════════
-   STAFF SELECTOR
+   ACCOUNTS TAB — управление аккаунтами админов
    ═══════════════════════════════════════════════ */
 
-function StaffSelector({
-  staff,
-  onSelect,
-  onBack,
-}: {
-  staff: StaffMember[];
-  onSelect: (id: string) => void;
-  onBack: () => void;
-}) {
-  const activeStaff = staff.filter((s) => s.active);
+/* ═══════════════════════════════════════════════
+   ACCOUNTS TAB — управление аккаунтами админов
+   ═══════════════════════════════════════════════ */
+
+const ALL_PERMISSIONS = [
+  { id: "view_admin", label: "Доступ к панели" },
+  { id: "manage_members", label: "Состав" },
+  { id: "manage_leaderships", label: "Лидерки" },
+  { id: "manage_announcements", label: "Объявления" },
+  { id: "manage_rules", label: "Правила" },
+  { id: "manage_settings", label: "Настройки/Страницы" },
+  { id: "all", label: "Все права (root)" },
+] as const;
+
+function AccountsTab({ currentAccountId }: { currentAccountId: string }) {
+  const [accounts, setAccounts] = useState<StaffAccountResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+
+  // Create form
+  const [cUsername, setCUsername] = useState("");
+  const [cPassword, setCPassword] = useState("");
+  const [cDisplay, setCDisplay] = useState("");
+  const [cPosition, setCPosition] = useState("");
+  const [cPerms, setCPerms] = useState<string[]>(["view_admin"]);
+  const [cError, setCError] = useState("");
+  const [cSaving, setCsaving] = useState(false);
+
+  // Edit form
+  const [eDisplay, setEDisplay] = useState("");
+  const [ePosition, setEPosition] = useState("");
+  const [ePerms, setEPerms] = useState<string[]>([]);
+  const [ePassword, setEPassword] = useState("");
+  const [eSaving, setESaving] = useState(false);
+
+  const refresh = async () => {
+    setLoading(true);
+    const data = await listAdminAccounts();
+    if (data) setAccounts(data);
+    setLoading(false);
+  };
+
+  useEffect(() => { void refresh(); }, []);
+
+  const startEdit = (acc: StaffAccountResponse) => {
+    setEditId(acc.id);
+    setEDisplay(acc.displayName);
+    setEPosition(acc.position);
+    setEPerms([...acc.permissions]);
+    setEPassword("");
+  };
+
+  const saveEdit = async () => {
+    if (!editId) return;
+    setESaving(true);
+    const payload: Parameters<typeof updateAdminAccount>[1] = {
+      displayName: eDisplay,
+      position: ePosition,
+      permissions: ePerms,
+    };
+    if (ePassword) payload.password = ePassword;
+    const res = await updateAdminAccount(editId, payload);
+    if (res?.ok) {
+      setAccounts((prev) => prev.map((a) => (a.id === editId ? res.account : a)));
+      setEditId(null);
+    }
+    setESaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Удалить аккаунт?")) return;
+    await deleteAdminAccount(id);
+    setAccounts((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cUsername.trim() || !cPassword) { setCError("Логин и пароль обязательны"); return; }
+    setCsaving(true);
+    setCError("");
+    const res = await createAdminAccount({
+      username: cUsername.trim(),
+      password: cPassword,
+      displayName: cDisplay || cUsername.trim(),
+      position: cPosition || "Администратор",
+      permissions: cPerms,
+    });
+    if (res?.ok) {
+      setAccounts((prev) => [...prev, res.account]);
+      setShowCreate(false);
+      setCUsername(""); setCPassword(""); setCDisplay(""); setCPosition(""); setCPerms(["view_admin"]);
+    } else {
+      setCError("Логин уже занят или ошибка сервера");
+    }
+    setCsaving(false);
+  };
+
+  const togglePerm = (perms: string[], p: string, set: (v: string[]) => void) => {
+    set(perms.includes(p) ? perms.filter((x) => x !== p) : [...perms, p]);
+  };
+
+  const inputCls = "w-full bg-[#0a0a12] border border-white/8 focus:border-[#9b2335]/30 text-white/70 font-['Oswald'] tracking-wide px-3 py-2.5 outline-none transition-colors";
+  const inputStyle = { fontSize: "0.82rem" };
+
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center px-4">
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#9b2335]/3 blur-[200px] rounded-full pointer-events-none" />
-
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="w-full max-w-md relative"
-      >
-        <div className="text-center mb-10">
-          <h1 className="font-['Russo_One'] text-[#9b2335]" style={{ fontSize: "1.5rem", letterSpacing: "0.05em" }}>
-            SCHWARZ FAMILY
-          </h1>
-          <p className="font-['Oswald'] text-white/20 uppercase tracking-[0.3em] mt-2" style={{ fontSize: "0.65rem" }}>
-            Выберите свой профиль
-          </p>
+    <div>
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="font-['Russo_One'] text-white" style={{ fontSize: "1.5rem" }}>
+          Аккаунты
+        </h2>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={refresh}
+            className="text-white/20 hover:text-white/50 transition-colors"
+            title="Обновить"
+          >
+            <RefreshCw size={16} />
+          </button>
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="flex items-center gap-2 font-['Oswald'] uppercase tracking-wider text-white/60 hover:text-white border border-white/10 hover:border-white/20 px-4 py-2 transition-all"
+            style={{ fontSize: "0.7rem" }}
+          >
+            <Plus size={14} />
+            Добавить
+          </button>
         </div>
+      </div>
 
-        <div className="border border-white/8 bg-white/[0.02] p-6 space-y-2">
-          {activeStaff.map((s) => {
-            const permCount = s.permissions.length;
-            return (
-              <button
-                key={s.id}
-                onClick={() => onSelect(s.id)}
-                className="w-full flex items-center gap-4 p-4 border border-white/5 bg-white/[0.01] hover:border-[#9b2335]/20 hover:bg-[#9b2335]/[0.02] transition-all duration-300 group"
-              >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center border border-[#9b2335]/15 bg-[#9b2335]/5 shrink-0">
-                  <User size={18} className="text-[#9b2335]/50" />
+      {/* Create form */}
+      <AnimatePresence>
+        {showCreate && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-6 border border-[#9b2335]/20 bg-[#9b2335]/[0.03] p-6"
+          >
+            <p className="font-['Oswald'] text-white/50 uppercase tracking-wider mb-5" style={{ fontSize: "0.7rem" }}>
+              Новый аккаунт
+            </p>
+            <form onSubmit={handleCreate} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input value={cUsername} onChange={(e) => setCUsername(e.target.value)} placeholder="Логин*" className={inputCls} style={inputStyle} />
+                <input type="password" value={cPassword} onChange={(e) => setCPassword(e.target.value)} placeholder="Пароль*" className={inputCls} style={inputStyle} />
+                <input value={cDisplay} onChange={(e) => setCDisplay(e.target.value)} placeholder="Отображаемое имя" className={inputCls} style={inputStyle} />
+                <input value={cPosition} onChange={(e) => setCPosition(e.target.value)} placeholder="Должность" className={inputCls} style={inputStyle} />
+              </div>
+              <div>
+                <p className="font-['Oswald'] text-white/20 uppercase tracking-wider mb-2" style={{ fontSize: "0.62rem" }}>Права доступа</p>
+                <div className="flex flex-wrap gap-2">
+                  {ALL_PERMISSIONS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => togglePerm(cPerms, p.id, setCPerms)}
+                      className={`font-['Oswald'] tracking-wide px-3 py-1.5 border text-xs transition-all ${
+                        cPerms.includes(p.id)
+                          ? "border-[#9b2335]/40 bg-[#9b2335]/10 text-[#9b2335]/80"
+                          : "border-white/8 text-white/25 hover:border-white/15"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
                 </div>
-                <div className="flex-1 text-left">
-                  <p className="font-['Oswald'] text-white/70 tracking-wide group-hover:text-white/90 transition-colors" style={{ fontSize: "0.9rem" }}>
-                    {s.name}
-                  </p>
-                  <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.65rem" }}>
-                    {s.position} · {permCount} {permCount === 1 ? "право" : permCount < 5 ? "права" : "прав"}
-                  </p>
+              </div>
+              {cError && <p className="font-['Oswald'] text-[#ff3366]/60" style={{ fontSize: "0.7rem" }}>{cError}</p>}
+              <div className="flex gap-3 pt-1">
+                <button type="submit" disabled={cSaving} className="font-['Oswald'] uppercase tracking-wider text-white bg-[#9b2335] hover:bg-[#b52a40] px-6 py-2 transition-all disabled:opacity-40" style={{ fontSize: "0.7rem" }}>
+                  {cSaving ? "Создание..." : "Создать"}
+                </button>
+                <button type="button" onClick={() => setShowCreate(false)} className="font-['Oswald'] uppercase tracking-wider text-white/30 hover:text-white/60 px-4 py-2 transition-colors" style={{ fontSize: "0.7rem" }}>
+                  Отмена
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Accounts list */}
+      {loading ? (
+        <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.8rem" }}>Загрузка...</p>
+      ) : accounts.length === 0 ? (
+        <p className="font-['Oswald'] text-white/15 tracking-wide" style={{ fontSize: "0.8rem" }}>Аккаунты не найдены</p>
+      ) : (
+        <div className="space-y-3">
+          {accounts.map((acc) => (
+            <div key={acc.id} className="border border-white/5 bg-white/[0.01]">
+              {editId === acc.id ? (
+                /* Edit form */
+                <div className="p-5 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input value={eDisplay} onChange={(e) => setEDisplay(e.target.value)} placeholder="Отображаемое имя" className={inputCls} style={inputStyle} />
+                    <input value={ePosition} onChange={(e) => setEPosition(e.target.value)} placeholder="Должность" className={inputCls} style={inputStyle} />
+                  </div>
+                  <input type="password" value={ePassword} onChange={(e) => setEPassword(e.target.value)} placeholder="Новый пароль (оставьте пустым чтобы не менять)" className={inputCls} style={inputStyle} />
+                  {!acc.isRoot && (
+                    <div>
+                      <p className="font-['Oswald'] text-white/20 uppercase tracking-wider mb-2" style={{ fontSize: "0.62rem" }}>Права доступа</p>
+                      <div className="flex flex-wrap gap-2">
+                        {ALL_PERMISSIONS.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => togglePerm(ePerms, p.id, setEPerms)}
+                            className={`font-['Oswald'] tracking-wide px-3 py-1.5 border text-xs transition-all ${
+                              ePerms.includes(p.id)
+                                ? "border-[#9b2335]/40 bg-[#9b2335]/10 text-[#9b2335]/80"
+                                : "border-white/8 text-white/25 hover:border-white/15"
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-3 pt-1">
+                    <button onClick={saveEdit} disabled={eSaving} className="flex items-center gap-1.5 font-['Oswald'] uppercase tracking-wider text-white bg-[#9b2335] hover:bg-[#b52a40] px-5 py-2 transition-all disabled:opacity-40" style={{ fontSize: "0.68rem" }}>
+                      <Save size={13} /> {eSaving ? "Сохранение..." : "Сохранить"}
+                    </button>
+                    <button onClick={() => setEditId(null)} className="font-['Oswald'] uppercase tracking-wider text-white/30 hover:text-white/60 px-4 py-2 transition-colors" style={{ fontSize: "0.68rem" }}>
+                      Отмена
+                    </button>
+                  </div>
                 </div>
-                <ChevronRight size={14} className="text-white/10 group-hover:text-[#9b2335]/40 transition-colors shrink-0" />
-              </button>
-            );
-          })}
+              ) : (
+                /* Account row */
+                <div className="flex items-center justify-between px-5 py-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#9b2335]/10 border border-[#9b2335]/15 shrink-0">
+                      {acc.isRoot ? <KeyRound size={14} className="text-[#9b2335]/60" /> : <User size={14} className="text-white/30" />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-['Oswald'] text-white/80 tracking-wide" style={{ fontSize: "0.85rem" }}>
+                          {acc.displayName}
+                        </p>
+                        <span className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.65rem" }}>
+                          @{acc.username}
+                        </span>
+                        {acc.isRoot && (
+                          <span className="font-['Oswald'] text-[#9b2335]/60 border border-[#9b2335]/20 px-1.5 py-0.5 tracking-wider" style={{ fontSize: "0.55rem" }}>
+                            ROOT
+                          </span>
+                        )}
+                        {acc.id === currentAccountId && (
+                          <span className="font-['Oswald'] text-[#22c55e]/50 border border-[#22c55e]/15 px-1.5 py-0.5 tracking-wider" style={{ fontSize: "0.55rem" }}>
+                            ВЫ
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.65rem" }}>
+                        {acc.position} · {acc.permissions.includes("all") ? "Все права" : acc.permissions.join(", ")}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => startEdit(acc)}
+                      className="p-2 text-white/20 hover:text-white/60 transition-colors"
+                      title="Редактировать"
+                    >
+                      <Edit3 size={15} />
+                    </button>
+                    {!acc.isRoot && acc.id !== currentAccountId && (
+                      <button
+                        onClick={() => handleDelete(acc.id)}
+                        className="p-2 text-white/15 hover:text-[#ff3366]/60 transition-colors"
+                        title="Удалить"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-
-        <button
-          onClick={onBack}
-          className="w-full mt-4 font-['Oswald'] text-white/15 uppercase tracking-wider hover:text-white/30 transition-colors py-2"
-          style={{ fontSize: "0.65rem" }}
-        >
-          ← Выйти из админки
-        </button>
-      </motion.div>
+      )}
     </div>
   );
 }
@@ -2700,11 +2873,30 @@ function StaffSelector({
    ═══════════════════════════════════════════════ */
 
 export function AdminPage() {
-  const pocketBaseEnabled = isPocketBaseEnabled();
-  const [authed, setAuthed] = useState(() => sessionStorage.getItem("schwarz_admin_auth") === "1" || hasPocketBaseAuth());
+  const [authed, setAuthed] = useState(() => sessionStorage.getItem("schwarz_admin_auth") === "1");
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [currentStaffId, setCurrentStaffId] = useState<string | null>(() => sessionStorage.getItem("schwarz_admin_staff_id") || getPocketBaseAuthStaffId());
+
+  // currentAccount stores the authenticated staff account (from API, persisted in sessionStorage)
+  const [currentAccount, setCurrentAccount] = useState<StaffAccountResponse | null>(() => {
+    try {
+      const raw = sessionStorage.getItem("schwarz_admin_account");
+      return raw ? (JSON.parse(raw) as StaffAccountResponse) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Derive currentStaff (StaffMember shape) from currentAccount for permission checks
+  const currentStaff: StaffMember | null = currentAccount
+    ? {
+        id: currentAccount.id,
+        name: currentAccount.displayName,
+        position: currentAccount.position,
+        permissions: currentAccount.permissions,
+        active: currentAccount.active,
+      }
+    : null;
 
   const [members, setMembersState] = useState<Member[]>(() => loadState("members", defaultMembers));
   const [leaderships, setLeadershipsState] = useState<Leadership[]>(() => loadState("leaderships", defaultLeaderships));
@@ -2713,43 +2905,10 @@ export function AdminPage() {
   const [principles, setPrinciplesState] = useState<Principle[]>(() => loadState("principles", defaultPrinciples));
   const [staffMembers, setStaffState] = useState<StaffMember[]>(() => loadState("staff", defaultStaff));
 
-  useEffect(() => {
-    if (!pocketBaseEnabled) return;
-
-    void Promise.all([
-      getPocketBaseState<Leadership[]>("leaderships"),
-      getPocketBaseState<Announcement[]>("announcements"),
-      getPocketBaseState<Rule[]>("rules"),
-      getPocketBaseState<Principle[]>("principles"),
-      getPocketBaseState<StaffMember[]>("staff"),
-    ]).then(([pbLeaderships, pbAnnouncements, pbRules, pbPrinciples, pbStaff]) => {
-      if (pbLeaderships) {
-        setLeadershipsState(pbLeaderships);
-        localStorage.setItem("schwarz_admin_leaderships", JSON.stringify(pbLeaderships));
-      }
-      if (pbAnnouncements) {
-        setAnnouncementsState(pbAnnouncements);
-        localStorage.setItem("schwarz_admin_announcements", JSON.stringify(pbAnnouncements));
-      }
-      if (pbRules) {
-        setRulesState(pbRules);
-        localStorage.setItem("schwarz_admin_rules", JSON.stringify(pbRules));
-      }
-      if (pbPrinciples) {
-        setPrinciplesState(pbPrinciples);
-        localStorage.setItem("schwarz_admin_principles", JSON.stringify(pbPrinciples));
-      }
-      if (pbStaff) {
-        setStaffState(pbStaff);
-        localStorage.setItem("schwarz_admin_staff", JSON.stringify(pbStaff));
-      }
-    });
-  }, [pocketBaseEnabled]);
-
   const setMembers = (m: Member[]) => {
     setMembersState(m);
     saveState("members", m);
-    void syncPocketBaseUsers(m);
+    void putAdminSnapshot({ members: m });
   };
   const setLeaderships = (l: Leadership[]) => {
     setLeadershipsState(l);
@@ -2758,6 +2917,7 @@ export function AdminPage() {
   const setAnnouncements = (a: Announcement[]) => {
     setAnnouncementsState(a);
     saveState("announcements", a);
+    void putAdminSnapshot({ announcements: a });
   };
   const setRules = (r: Rule[]) => {
     setRulesState(r);
@@ -2770,24 +2930,18 @@ export function AdminPage() {
   const setStaff = (s: StaffMember[]) => {
     setStaffState(s);
     saveState("staff", s);
-    void syncPocketBaseStaff(s);
   };
 
+  // Sync members from API on mount (overrides stale localStorage)
   useEffect(() => {
-    if (!pocketBaseEnabled) return;
-
-    void listPocketBaseStaff().then((remoteStaff) => {
-      if (!remoteStaff || remoteStaff.length === 0) return;
-      setStaffState(remoteStaff);
-      saveState("staff", remoteStaff);
+    getAdminSnapshot().then((snap) => {
+      if (snap && Array.isArray(snap.members) && snap.members.length > 0) {
+        const m = snap.members as Member[];
+        setMembersState(m);
+        saveState("members", m);
+      }
     });
-
-    void listPocketBaseUsers().then((remoteUsers) => {
-      if (!remoteUsers || remoteUsers.length === 0) return;
-      setMembersState(remoteUsers);
-      saveState("members", remoteUsers);
-    });
-  }, [pocketBaseEnabled]);
+  }, []);
 
   // Pages & Navbar writable data
   const adminData = useAdminDataWritable();
@@ -2795,33 +2949,29 @@ export function AdminPage() {
 
   const handleLogout = () => {
     sessionStorage.removeItem("schwarz_admin_auth");
-    sessionStorage.removeItem("schwarz_admin_staff_id");
-    logoutPocketBaseAdmin();
+    sessionStorage.removeItem("schwarz_admin_account");
     setAuthed(false);
-    setCurrentStaffId(null);
+    setCurrentAccount(null);
   };
 
-  const handleLogin = (staffId?: string) => {
+  const handleLogin = (account: StaffAccountResponse) => {
     sessionStorage.setItem("schwarz_admin_auth", "1");
+    sessionStorage.setItem("schwarz_admin_account", JSON.stringify(account));
     setAuthed(true);
-
-    if (staffId) {
-      sessionStorage.setItem("schwarz_admin_staff_id", staffId);
-      setCurrentStaffId(staffId);
-    }
+    setCurrentAccount(account);
   };
 
-  const currentStaff = staffMembers.find((s) => s.id === currentStaffId && s.active);
   const allowedTabs: Tab[] | undefined = currentStaff
     ? (Object.entries(tabPermissions)
-        .filter(([, perm]) => !perm || currentStaff.permissions.includes(perm))
+        .filter(([, perm]) => {
+          if (!perm) return true;
+          return (
+            currentStaff.permissions.includes(perm) ||
+            currentStaff.permissions.includes("all")
+          );
+        })
         .map(([tab]) => tab as Tab))
     : undefined;
-
-  const handleSelectStaff = (id: string) => {
-    sessionStorage.setItem("schwarz_admin_staff_id", id);
-    setCurrentStaffId(id);
-  };
 
   const handleTabChange = (tab: Tab) => {
     if (allowedTabs && !allowedTabs.includes(tab)) return;
@@ -2829,11 +2979,12 @@ export function AdminPage() {
   };
 
   if (!authed) {
-    return <LoginScreen onLogin={handleLogin} pocketBaseEnabled={pocketBaseEnabled} />;
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
-  if (!currentStaffId || !currentStaff) {
-    return <StaffSelector staff={staffMembers} onSelect={handleSelectStaff} onBack={handleLogout} />;
+  if (!currentStaff) {
+    // Session exists but account missing — clear and re-login
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   return (
@@ -2874,16 +3025,6 @@ export function AdminPage() {
             </span>
           </div>
           <div className="flex items-center gap-4">
-            {currentStaff && (
-              <button
-                onClick={() => { sessionStorage.removeItem("schwarz_admin_staff_id"); setCurrentStaffId(null); }}
-                className="font-['Oswald'] text-white/20 tracking-wide hover:text-white/40 transition-colors"
-                style={{ fontSize: "0.6rem" }}
-                title="Сменить профиль"
-              >
-                [ сменить ]
-              </button>
-            )}
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-[#9b2335]" />
               <span className="font-['Oswald'] text-white/25 tracking-wide" style={{ fontSize: "0.65rem" }}>
@@ -2938,6 +3079,7 @@ export function AdminPage() {
               {activeTab === "polls" && <PollsTab staffName={currentStaff?.name ?? "Admin"} />}
               {activeTab === "auditlog" && <AuditLogTab />}
               {activeTab === "settings" && <SettingsTab />}
+              {activeTab === "accounts" && <AccountsTab currentAccountId={currentAccount?.id ?? ""} />}
             </motion.div>
           </AnimatePresence>
         </div>
