@@ -48,6 +48,7 @@ const defaultDb = {
     members: [],
   },
   applications: [],
+  contracts: [],
   polls: [],
   pollVoters: {},
   staffAccounts: [],
@@ -168,6 +169,49 @@ app.post("/api/polls/vote", (req, res) => {
     };
   });
 
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   CONTRACTS
+───────────────────────────────────────── */
+
+app.get("/api/contracts", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.contracts) ? db.contracts : []);
+});
+
+app.post("/api/contracts", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.contracts)) db.contracts = [];
+  const contract = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    title: req.body?.title || "Контракт",
+    description: req.body?.description || "",
+    reward: req.body?.reward || "",
+    available: req.body?.available !== false,
+    createdAt: new Date().toISOString(),
+  };
+  db.contracts.unshift(contract);
+  writeDb(db);
+  res.status(201).json({ ok: true, contract });
+});
+
+app.patch("/api/contracts/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.contracts)) return res.status(404).json({ ok: false });
+  db.contracts = db.contracts.map((c) =>
+    c.id === req.params.id ? { ...c, ...(req.body || {}) } : c
+  );
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.delete("/api/contracts/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.contracts)) return res.status(404).json({ ok: false });
+  db.contracts = db.contracts.filter((c) => c.id !== req.params.id);
   writeDb(db);
   res.json({ ok: true });
 });

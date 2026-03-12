@@ -1,10 +1,28 @@
 import { motion } from "motion/react";
-import { ChevronDown, Send } from "lucide-react";
+import { ChevronDown, Send, Music2 } from "lucide-react";
 import { Link } from "react-router";
 import { GraffitiTitle } from "./GraffitiTitle";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { useAdminData } from "../hooks/useAdminData";
 import { TwitchLiveBadge } from "./TwitchLiveStatus";
+
+const TIKTOK_URL = "https://www.tiktok.com/@nebesnyin";
+
+function TikTokBadge() {
+  return (
+    <a
+      href={TIKTOK_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-2.5 px-4 py-2 border bg-white/[0.02] border-white/8 hover:bg-[#ff0050]/10 hover:border-[#ff0050]/25 transition-all duration-300"
+    >
+      <Music2 size={12} className="text-white/40 group-hover:text-[#ff0050]" />
+      <span className="font-['Oswald'] text-white/40 uppercase tracking-wider" style={{ fontSize: "0.6rem" }}>
+        TikTok
+      </span>
+    </a>
+  );
+}
 
 const bgImage =
   "https://images.unsplash.com/photo-1696592875920-d98bf80d285e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkYXJrJTIwdXJiYW4lMjBjaXR5JTIwbmlnaHQlMjBuZW9ufGVufDF8fHx8MTc3MjAzNDc4Nnww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral";
@@ -84,14 +102,15 @@ export function HeroSection() {
           </Link>
         </motion.div>
 
-        {/* Twitch Live Badge */}
+        {/* Social badges */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.3, duration: 0.5 }}
-          className="mt-8 flex justify-center"
+          className="mt-8 flex justify-center items-center gap-3"
         >
           <TwitchLiveBadge />
+          <TikTokBadge />
         </motion.div>
       </div>
 

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "api": "node server/api-server.mjs",
+    "bot": "node bot/bot.mjs",
     "build": "tsc -b && vite build",
     "start": "node server/api-server.mjs",
     "lint": "eslint .",
@@ -51,6 +52,7 @@
     "date-fns": "3.6.0",
     "embla-carousel-react": "8.6.0",
     "express": "^5.2.1",
+    "grammy": "^1.41.1",
     "input-otp": "1.4.2",
     "lucide-react": "0.487.0",
     "motion": "^12.34.3",
