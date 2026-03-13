@@ -4,9 +4,13 @@ import {
   deleteApplicationById,
   getAdminSnapshot,
   listApplications,
+  listNews,
+  listMoments,
   listPolls,
   putAdminSnapshot,
   putApplications,
+  putNews,
+  putMoments,
   putPolls,
   updateApplication as updateApplicationEndpoint,
   votePoll,
@@ -53,7 +57,7 @@ export interface PageOverride {
 export interface AdminMember {
   id: string;
   name: string;
-  role: "owner" | "dep_owner" | "veteran" | "member";
+  role: "owner" | "dep_owner" | "close" | "old" | "main" | "academy" | "veteran" | "member";
   joinDate: string;
   active: boolean;
   badges?: string[];
@@ -91,7 +95,7 @@ export interface AuditLogEntry {
   id: string;
   timestamp: string;
   action: string;
-  category: "members" | "leaderships" | "announcements" | "rules" | "settings" | "nav" | "pages" | "applications";
+  category: "members" | "leaderships" | "announcements" | "rules" | "settings" | "nav" | "pages" | "applications" | "news" | "media";
   details: string;
   staffName: string;
 }
@@ -248,6 +252,9 @@ export const defaultNavItems: NavItem[] = [
   { id: "rules", label: "Правила", path: "/rules", visible: true },
   { id: "how-to-play", label: "Как играть?", path: "/how-to-play", visible: true },
   { id: "contacts", label: "Контакты", path: "/contacts", visible: true },
+  { id: "news", label: "Schwarz News", path: "/news", visible: true },
+  { id: "moments", label: "Моменты", path: "/moments", visible: true },
+  { id: "polls", label: "Голосования", path: "/polls", visible: false },
 ];
 
 /* ══════════════════════════════════════════════
@@ -471,4 +478,144 @@ export function useApplications() {
   const pendingCount = applications.filter((a) => a.status === "pending").length;
 
   return { applications, setApplications, updateApplication, deleteApplication, pendingCount };
+}
+
+/* ═══════════════════════════════════════════════
+   NEWS ARTICLE
+   ═══════════════════════════════════════════════ */
+
+export const NEWS_CATEGORIES = [
+  "Семейные дела",
+  "Крим. хроника",
+  "Репортаж",
+  "Объявление",
+  "Обновление",
+  "Другое",
+] as const;
+
+export type NewsCategory = (typeof NEWS_CATEGORIES)[number];
+
+export interface NewsArticle {
+  id: string;
+  title: string;
+  category: NewsCategory;
+  excerpt: string;
+  coverImage?: string;
+  content: string; // HTML
+  author: string;
+  publishedAt: string;
+  published: boolean;
+  createdAt: string;
+}
+
+const defaultNewsArticles: NewsArticle[] = [];
+
+export function useNews() {
+  const [articles, setArticlesState] = useState<NewsArticle[]>(() =>
+    load("newsArticles", defaultNewsArticles)
+  );
+
+  useEffect(() => {
+    void listNews<NewsArticle>().then((remote) => {
+      if (!remote || remote.length === 0) return;
+      setArticlesState(remote);
+      save("newsArticles", remote);
+    });
+  }, []);
+
+  const setArticles = useCallback((a: NewsArticle[]) => {
+    setArticlesState(a);
+    save("newsArticles", a);
+    void putNews(a);
+  }, []);
+
+  const addArticle = (article: Omit<NewsArticle, "id" | "createdAt">) => {
+    const newArticle: NewsArticle = {
+      ...article,
+      id: `news_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newArticle, ...articles];
+    setArticles(updated);
+    return newArticle;
+  };
+
+  const updateArticle = (id: string, updates: Partial<NewsArticle>) => {
+    const updated = articles.map((a) => (a.id === id ? { ...a, ...updates } : a));
+    setArticles(updated);
+  };
+
+  const deleteArticle = (id: string) => {
+    setArticles(articles.filter((a) => a.id !== id));
+  };
+
+  const publishedArticles = articles.filter((a) => a.published);
+
+  return { articles, setArticles, addArticle, updateArticle, deleteArticle, publishedArticles };
+}
+
+export function usePublicNews(): NewsArticle[] {
+  return load<NewsArticle[]>("newsArticles", defaultNewsArticles).filter((a) => a.published);
+}
+
+/* ═══════════════════════════════════════════════
+   MOMENTS
+   ═══════════════════════════════════════════════ */
+
+export type MomentCategory =
+  | "leadership"
+  | "vzp"
+  | "family"
+  | "raids"
+  | "streams"
+  | "other";
+
+export const MOMENT_CATEGORIES: { id: MomentCategory; label: string; color: string; emoji: string }[] = [
+  { id: "leadership", label: "Лидерки", color: "#9b2335", emoji: "🏆" },
+  { id: "vzp", label: "ВЗП", color: "#f59e0b", emoji: "🏙" },
+  { id: "family", label: "Семья", color: "#ff3366", emoji: "👨‍👩‍👦" },
+  { id: "raids", label: "Рейды", color: "#a855f7", emoji: "⚔️" },
+  { id: "streams", label: "Стримы", color: "#9146ff", emoji: "📡" },
+  { id: "other", label: "Другое", color: "#6b7280", emoji: "📸" },
+];
+
+export interface Moment {
+  id: string;
+  title: string;
+  description?: string;
+  url: string;
+  videoUrl?: string;
+  type: "photo" | "video";
+  category: MomentCategory;
+  date: string;
+  author: string;
+  featured: boolean;
+  visible: boolean;
+  order: number;
+}
+
+export function useMoments() {
+  const [moments, setMomentsState] = useState<Moment[]>(() =>
+    load("moments", [] as Moment[])
+  );
+
+  useEffect(() => {
+    void listMoments<Moment>().then((remote) => {
+      if (!remote || remote.length === 0) return;
+      setMomentsState(remote);
+      save("moments", remote);
+    });
+  }, []);
+
+  const setMoments = useCallback((m: Moment[]) => {
+    setMomentsState(m);
+    save("moments", m);
+    void putMoments(m);
+  }, []);
+
+  return { moments, setMoments };
+}
+
+export function usePublicMoments(): Moment[] {
+  return load<Moment[]>("moments", []).filter((m) => m.visible);
 }

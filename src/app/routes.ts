@@ -14,6 +14,11 @@ import { CurrentLeadershipPage } from "./pages/CurrentLeadershipPage";
 import { PollsPage } from "./pages/PollsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { CustomPage } from "./pages/CustomPage";
+import { SchwarzNewsPage } from "./pages/SchwarzNewsPage";
+import { NewsArticlePage } from "./pages/NewsArticlePage";
+import { MomentsPage } from "./pages/MomentsPage";
+import { LoginPage } from "./pages/LoginPage";
+import { CabinetPage } from "./pages/CabinetPage";
 
 export const router = createBrowserRouter([
   {
@@ -29,7 +34,6 @@ export const router = createBrowserRouter([
           { path: "current-leadership", Component: CurrentLeadershipPage },
           { path: "media", Component: MediaPage },
           { path: "members", Component: MembersPage },
-          // /family-tree redirects to /members (same component)
           { path: "family-tree", Component: MembersPage },
           { path: "redux", Component: ReduxPage },
           { path: "rules", Component: RulesPage },
@@ -37,12 +41,23 @@ export const router = createBrowserRouter([
           { path: "join", Component: JoinFamilyPage },
           { path: "polls", Component: PollsPage },
           { path: "contacts", Component: ContactsPage },
+          { path: "news", Component: SchwarzNewsPage },
+          { path: "news/:id", Component: NewsArticlePage },
+          { path: "moments", Component: MomentsPage },
           { path: "page/:slug", Component: CustomPage },
         ],
       },
       {
         path: "admin",
         Component: AdminPage,
+      },
+      {
+        path: "login",
+        Component: LoginPage,
+      },
+      {
+        path: "cabinet",
+        Component: CabinetPage,
       },
     ],
   },

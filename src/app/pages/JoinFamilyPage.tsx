@@ -267,7 +267,7 @@ function ApplicationForm() {
     setTimeout(() => {
       const result = submitApplication(form);
       setAppId(result.id);
-      notifyNewApplication(form.nickname, form.server, form.discord);
+      notifyNewApplication(form.nickname, form.discord);
       setSubmitting(false);
       setSubmitted(true);
       setForm(emptyForm);

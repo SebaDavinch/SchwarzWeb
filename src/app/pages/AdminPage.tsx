@@ -2913,6 +2913,7 @@ export function AdminPage() {
   const setLeaderships = (l: Leadership[]) => {
     setLeadershipsState(l);
     saveState("leaderships", l);
+    void putAdminSnapshot({ leaderships: l });
   };
   const setAnnouncements = (a: Announcement[]) => {
     setAnnouncementsState(a);
@@ -2922,23 +2923,46 @@ export function AdminPage() {
   const setRules = (r: Rule[]) => {
     setRulesState(r);
     saveState("rules", r);
+    void putAdminSnapshot({ rules: r });
   };
   const setPrinciples = (p: Principle[]) => {
     setPrinciplesState(p);
     saveState("principles", p);
+    void putAdminSnapshot({ principles: p });
   };
   const setStaff = (s: StaffMember[]) => {
     setStaffState(s);
     saveState("staff", s);
   };
 
-  // Sync members from API on mount (overrides stale localStorage)
+  // Sync all data from API on mount
   useEffect(() => {
     getAdminSnapshot().then((snap) => {
-      if (snap && Array.isArray(snap.members) && snap.members.length > 0) {
+      if (!snap) return;
+      if (Array.isArray(snap.members) && snap.members.length > 0) {
         const m = snap.members as Member[];
         setMembersState(m);
         saveState("members", m);
+      }
+      if (Array.isArray(snap.leaderships) && snap.leaderships.length > 0) {
+        const l = snap.leaderships as Leadership[];
+        setLeadershipsState(l);
+        saveState("leaderships", l);
+      }
+      if (Array.isArray(snap.announcements) && snap.announcements.length > 0) {
+        const a = snap.announcements as Announcement[];
+        setAnnouncementsState(a);
+        saveState("announcements", a);
+      }
+      if (Array.isArray(snap.rules) && snap.rules.length > 0) {
+        const r = snap.rules as Rule[];
+        setRulesState(r);
+        saveState("rules", r);
+      }
+      if (Array.isArray(snap.principles) && snap.principles.length > 0) {
+        const p = snap.principles as Principle[];
+        setPrinciplesState(p);
+        saveState("principles", p);
       }
     });
   }, []);

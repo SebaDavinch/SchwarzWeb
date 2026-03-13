@@ -6,6 +6,11 @@ export interface AdminSnapshotResponse {
   customPages?: unknown[];
   pageOverrides?: unknown[];
   members?: unknown[];
+  leaderships?: unknown[];
+  rules?: unknown[];
+  principles?: unknown[];
+  newsArticles?: unknown[];
+  moments?: unknown[];
 }
 
 export interface VotePayload {
@@ -143,4 +148,66 @@ export async function updateAdminAccount(
 
 export async function deleteAdminAccount(id: string) {
   return requestVoid(`/auth/accounts/${id}`, { method: "DELETE" });
+}
+
+/* ─── News Articles ─── */
+
+export async function listNews<T>() {
+  return requestJson<T[]>("/news", { method: "GET" });
+}
+
+export async function putNews<T>(payload: T[]) {
+  return requestVoid("/news", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createNewsArticle<T>(payload: T) {
+  return requestJson<{ ok: boolean; article: T }>("/news", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateNewsArticle<T>(id: string, payload: Partial<T>) {
+  return requestVoid(`/news/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteNewsArticle(id: string) {
+  return requestVoid(`/news/${id}`, { method: "DELETE" });
+}
+
+/* ─── Moments ─── */
+
+export async function listMoments<T>() {
+  return requestJson<T[]>("/moments", { method: "GET" });
+}
+
+export async function putMoments<T>(payload: T[]) {
+  return requestVoid("/moments", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createMoment<T>(payload: T) {
+  return requestJson<{ ok: boolean; moment: T }>("/moments", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateMoment<T>(id: string, payload: Partial<T>) {
+  return requestVoid(`/moments/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteMoment(id: string) {
+  return requestVoid(`/moments/${id}`, { method: "DELETE" });
 }

@@ -46,6 +46,11 @@ const defaultDb = {
     customPages: [],
     pageOverrides: [],
     members: [],
+    leaderships: [],
+    rules: [],
+    principles: [],
+    newsArticles: [],
+    moments: [],
   },
   applications: [],
   contracts: [],
@@ -212,6 +217,104 @@ app.delete("/api/contracts/:id", (req, res) => {
   const db = readDb();
   if (!Array.isArray(db.contracts)) return res.status(404).json({ ok: false });
   db.contracts = db.contracts.filter((c) => c.id !== req.params.id);
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   NEWS ARTICLES
+───────────────────────────────────────── */
+
+app.get("/api/news", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.adminSnapshot?.newsArticles) ? db.adminSnapshot.newsArticles : []);
+});
+
+app.put("/api/news", (req, res) => {
+  const db = readDb();
+  if (!db.adminSnapshot) db.adminSnapshot = {};
+  db.adminSnapshot.newsArticles = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true, count: db.adminSnapshot.newsArticles.length });
+});
+
+app.post("/api/news", (req, res) => {
+  const db = readDb();
+  if (!db.adminSnapshot) db.adminSnapshot = {};
+  if (!Array.isArray(db.adminSnapshot.newsArticles)) db.adminSnapshot.newsArticles = [];
+  const article = {
+    id: `news_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    createdAt: new Date().toISOString(),
+    ...req.body,
+  };
+  db.adminSnapshot.newsArticles.unshift(article);
+  writeDb(db);
+  res.status(201).json({ ok: true, article });
+});
+
+app.patch("/api/news/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.adminSnapshot?.newsArticles)) return res.status(404).json({ ok: false });
+  db.adminSnapshot.newsArticles = db.adminSnapshot.newsArticles.map((a) =>
+    a.id === req.params.id ? { ...a, ...(req.body || {}) } : a
+  );
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.delete("/api/news/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.adminSnapshot?.newsArticles)) return res.status(404).json({ ok: false });
+  db.adminSnapshot.newsArticles = db.adminSnapshot.newsArticles.filter((a) => a.id !== req.params.id);
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   MOMENTS
+───────────────────────────────────────── */
+
+app.get("/api/moments", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.adminSnapshot?.moments) ? db.adminSnapshot.moments : []);
+});
+
+app.put("/api/moments", (req, res) => {
+  const db = readDb();
+  if (!db.adminSnapshot) db.adminSnapshot = {};
+  db.adminSnapshot.moments = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true, count: db.adminSnapshot.moments.length });
+});
+
+app.post("/api/moments", (req, res) => {
+  const db = readDb();
+  if (!db.adminSnapshot) db.adminSnapshot = {};
+  if (!Array.isArray(db.adminSnapshot.moments)) db.adminSnapshot.moments = [];
+  const moment = {
+    id: `moment_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    createdAt: new Date().toISOString(),
+    ...req.body,
+  };
+  db.adminSnapshot.moments.unshift(moment);
+  writeDb(db);
+  res.status(201).json({ ok: true, moment });
+});
+
+app.patch("/api/moments/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.adminSnapshot?.moments)) return res.status(404).json({ ok: false });
+  db.adminSnapshot.moments = db.adminSnapshot.moments.map((m) =>
+    m.id === req.params.id ? { ...m, ...(req.body || {}) } : m
+  );
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.delete("/api/moments/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.adminSnapshot?.moments)) return res.status(404).json({ ok: false });
+  db.adminSnapshot.moments = db.adminSnapshot.moments.filter((m) => m.id !== req.params.id);
   writeDb(db);
   res.json({ ok: true });
 });
