@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Bot, Key, Save, Eye, EyeOff, ToggleLeft, ToggleRight,
@@ -7,7 +7,7 @@ import {
   Users, Activity, AlertTriangle, Link2, Unlink,
   Bell, BellOff, UserCheck, UserX,
 } from "lucide-react";
-import { type Account, type TgNotifKey, TG_NOTIF_LABELS, TG_NOTIF_COLORS } from "../../hooks/useAuth";
+import { type TgNotifKey, TG_NOTIF_LABELS, TG_NOTIF_COLORS } from "../../hooks/useAuth";
 
 /* ════════════════════════════════════════════════════
    TYPES
@@ -144,14 +144,10 @@ const DEFAULT_CONFIG: BotConfig = { token: "", botUsername: "", enabled: false, 
    STORAGE
    ════════════════════════════════════════════════════ */
 
-const K = { config: "schwarz_tg_config", commands: "schwarz_tg_commands", admins: "schwarz_tg_admins" };
-
-function load<T>(key: string, fallback: T): T {
-  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fallback; }
-  catch { return fallback; }
-}
-function save<T>(key: string, val: T) { localStorage.setItem(key, JSON.stringify(val)); }
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+const API = (path: string, init?: RequestInit) =>
+  fetch(`/api/telegram/${path}`, { headers: { "Content-Type": "application/json" }, ...init }).then((r) => r.json());
 
 /* ════════════════════════════════════════════════════
    SHARED UI
@@ -499,39 +495,40 @@ function AdminModal({
   );
 }
 
+const ALL_NOTIFS: TgNotifKey[] = ["contracts", "announcements", "mentions", "treasury", "applications"];
+
 /* ════════════════════════════════════════════════════
-   ACCOUNT / MEMBER HELPERS (admin-side, no hook)
+   TG LINK TYPE (server-side)
    ════════════════════════════════════════════════════ */
 
-function loadAccounts(): Account[] {
-  try { const r = localStorage.getItem("schwarz_accounts"); return r ? JSON.parse(r) : []; }
-  catch { return []; }
+interface TgLink {
+  id: string;
+  memberId: string;
+  memberName: string;
+  memberRole?: string;
+  accountUsername?: string;
+  telegramId?: string;
+  telegramUsername?: string;
+  tgLinkedAt?: string;
+  tgNotifications?: TgNotifKey[];
 }
-function saveAccountsDirect(accounts: Account[]) {
-  localStorage.setItem("schwarz_accounts", JSON.stringify(accounts));
-}
-function loadMembersList(): { id: string; name: string; role: string }[] {
-  try { const r = localStorage.getItem("schwarz_admin_members"); return r ? JSON.parse(r) : []; }
-  catch { return []; }
-}
-
-const ALL_NOTIFS: TgNotifKey[] = ["contracts", "announcements", "mentions", "treasury", "applications"];
 
 /* ════════════════════════════════════════════════════
    TG LINK EDIT MODAL
    ════════════════════════════════════════════════════ */
 
 function TgLinkModal({
-  account, memberName, onSave, onClose,
+  link, onSave, onClose,
 }: {
-  account: Account;
-  memberName: string;
-  onSave: (changes: Partial<Account>) => void;
+  link: TgLink;
+  onSave: (changes: Partial<TgLink>) => void;
   onClose: () => void;
 }) {
-  const [telegramId, setTelegramId] = useState(account.telegramId ?? "");
-  const [telegramUsername, setTelegramUsername] = useState(account.telegramUsername ?? "");
-  const [notifs, setNotifs] = useState<TgNotifKey[]>(account.tgNotifications ?? [...ALL_NOTIFS]);
+  const [memberName, setMemberName] = useState(link.memberName);
+  const [memberId, setMemberId] = useState(link.memberId);
+  const [telegramId, setTelegramId] = useState(link.telegramId ?? "");
+  const [telegramUsername, setTelegramUsername] = useState(link.telegramUsername ?? "");
+  const [notifs, setNotifs] = useState<TgNotifKey[]>(link.tgNotifications ?? [...ALL_NOTIFS]);
 
   const toggleNotif = (k: TgNotifKey) =>
     setNotifs(n => n.includes(k) ? n.filter(x => x !== k) : [...n, k]);
@@ -539,11 +536,13 @@ function TgLinkModal({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
+      memberName: memberName.trim() || link.memberName,
+      memberId: memberId.trim() || link.memberId,
       telegramId: telegramId.trim() || undefined,
       telegramUsername: telegramUsername.trim() || undefined,
-      tgLinkedAt: (telegramId.trim() && !account.tgLinkedAt)
+      tgLinkedAt: (telegramId.trim() && !link.tgLinkedAt)
         ? new Date().toISOString().slice(0, 10)
-        : account.tgLinkedAt,
+        : link.tgLinkedAt,
       tgNotifications: notifs,
     });
     onClose();
@@ -554,7 +553,7 @@ function TgLinkModal({
     onClose();
   };
 
-  const isLinked = !!(account.telegramId || telegramId.trim());
+  const isLinked = !!(link.telegramId || telegramId.trim());
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -575,7 +574,7 @@ function TgLinkModal({
                 Привязка Telegram
               </p>
               <p className="text-white/25" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.55rem" }}>
-                {memberName} · @{account.username}
+                {link.memberName || "Новая привязка"}{link.accountUsername ? ` · @${link.accountUsername}` : ""}
               </p>
             </div>
           </div>
@@ -583,6 +582,20 @@ function TgLinkModal({
         </div>
 
         <form onSubmit={handleSave} className="p-5 space-y-5">
+          {/* Member info */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-white/20 uppercase tracking-widest mb-1.5" style={lSt}>Имя участника</p>
+              <input value={memberName} onChange={e => setMemberName(e.target.value)}
+                placeholder="Roman Schwarz" className={iCls} style={iSt} />
+            </div>
+            <div>
+              <p className="text-white/20 uppercase tracking-widest mb-1.5" style={lSt}>Member ID</p>
+              <input value={memberId} onChange={e => setMemberId(e.target.value)}
+                placeholder="ID из состава" className={iCls} style={iSt} />
+            </div>
+          </div>
+
           {/* TG fields */}
           <div className="space-y-3">
             <div>
@@ -602,9 +615,9 @@ function TgLinkModal({
                   placeholder="roman_schwarz" className={`${iCls} flex-1`} style={iSt} />
               </div>
             </div>
-            {account.tgLinkedAt && (
+            {link.tgLinkedAt && (
               <p className="text-white/15" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.55rem" }}>
-                Привязан: {account.tgLinkedAt}
+                Привязан: {link.tgLinkedAt}
               </p>
             )}
           </div>
@@ -690,36 +703,64 @@ const ROLE_LABELS_MAP: Record<string, string> = {
 };
 
 function LinksSection() {
-  const [accounts, setAccounts] = useState<Account[]>(() => loadAccounts());
-  const members = loadMembersList();
+  const [links, setLinks] = useState<TgLink[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<LinkFilter>("all");
   const [search, setSearch] = useState("");
-  const [modal, setModal] = useState<Account | null>(null);
+  const [modal, setModal] = useState<TgLink | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addMemberId, setAddMemberId] = useState("");
+  const [addTgId, setAddTgId] = useState("");
+  const [addTgUser, setAddTgUser] = useState("");
 
-  const persistUpdate = (accountId: string, changes: Partial<Account>) => {
-    const updated = accounts.map(a => a.id === accountId ? { ...a, ...changes } : a);
-    saveAccountsDirect(updated);
-    setAccounts(updated);
+  useEffect(() => {
+    API("links")
+      .then((data: TgLink[]) => { setLinks(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const persist = (next: TgLink[]) => {
+    setLinks(next);
+    API("links", { method: "PUT", body: JSON.stringify(next) });
   };
 
-  const getMemberName = (memberId: string) => members.find(m => m.id === memberId)?.name ?? "—";
-  const getMemberRole = (memberId: string) => members.find(m => m.id === memberId)?.role ?? "";
+  const persistUpdate = (linkId: string, changes: Partial<TgLink>) => {
+    persist(links.map(l => l.id === linkId ? { ...l, ...changes } : l));
+  };
 
-  const linkedCount   = accounts.filter(a => !!(a.telegramId || a.telegramUsername)).length;
-  const unlinkedCount = accounts.length - linkedCount;
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addName.trim()) return;
+    const newLink: TgLink = {
+      id: genId(),
+      memberName: addName.trim(),
+      memberId: addMemberId.trim() || genId(),
+      telegramId: addTgId.trim() || undefined,
+      telegramUsername: addTgUser.trim() || undefined,
+      tgLinkedAt: addTgId.trim() ? new Date().toISOString().slice(0, 10) : undefined,
+      tgNotifications: [...ALL_NOTIFS],
+    };
+    persist([...links, newLink]);
+    setAddName(""); setAddMemberId(""); setAddTgId(""); setAddTgUser("");
+    setShowAddForm(false);
+  };
 
-  const visible = accounts.filter(a => {
-    const isLinked = !!(a.telegramId || a.telegramUsername);
+  const linkedCount   = links.filter(l => !!(l.telegramId || l.telegramUsername)).length;
+  const unlinkedCount = links.length - linkedCount;
+
+  const visible = links.filter(l => {
+    const isLinked = !!(l.telegramId || l.telegramUsername);
     const matchFilter =
       filter === "all"      ? true :
       filter === "linked"   ? isLinked :
                               !isLinked;
     const q = search.toLowerCase();
     const matchSearch = !q
-      || a.username.toLowerCase().includes(q)
-      || getMemberName(a.memberId).toLowerCase().includes(q)
-      || (a.telegramUsername ?? "").toLowerCase().includes(q)
-      || (a.telegramId ?? "").includes(q);
+      || l.memberName.toLowerCase().includes(q)
+      || (l.accountUsername ?? "").toLowerCase().includes(q)
+      || (l.telegramUsername ?? "").toLowerCase().includes(q)
+      || (l.telegramId ?? "").includes(q);
     return matchFilter && matchSearch;
   });
 
@@ -728,9 +769,9 @@ function LinksSection() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Всего аккаунтов", value: accounts.length, color: "rgba(255,255,255,0.5)" },
-          { label: "Привязаны",       value: linkedCount,     color: "#22c55e" },
-          { label: "Не привязаны",    value: unlinkedCount,   color: "#ff3366" },
+          { label: "Всего привязок", value: links.length, color: "rgba(255,255,255,0.5)" },
+          { label: "Привязаны",      value: linkedCount,  color: "#22c55e" },
+          { label: "Не привязаны",   value: unlinkedCount, color: "#ff3366" },
         ].map(({ label, value, color }) => (
           <div key={label} className="border border-white/[0.06] p-4 text-center bg-white/[0.01]">
             <p style={{ fontFamily: "'Oswald',sans-serif", fontSize: "1.5rem", color, lineHeight: 1 }}>{value}</p>
@@ -744,9 +785,9 @@ function LinksSection() {
         <div className="relative flex-1 min-w-[160px]">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Имя, логин, @username, ID..." className={`${iCls} pl-8`} style={iSt} />
+            placeholder="Имя, @username, ID..." className={`${iCls} pl-8`} style={iSt} />
         </div>
-        <div className="flex gap-1.5 shrink-0">
+        <div className="flex gap-1.5 shrink-0 flex-wrap">
           {([
             { id: "all" as LinkFilter,      label: "Все",          icon: Users,     ac: "#9b2335" },
             { id: "linked" as LinkFilter,   label: "Привязаны",    icon: UserCheck, ac: "#22c55e" },
@@ -763,144 +804,188 @@ function LinksSection() {
               <Icon size={11} /> {label}
             </button>
           ))}
+          <Btn onClick={() => setShowAddForm(f => !f)} className="bg-[#9b2335]/80 hover:bg-[#9b2335] text-white">
+            <Plus size={13} /> Добавить
+          </Btn>
         </div>
       </div>
+
+      {/* Add form */}
+      <AnimatePresence>
+        {showAddForm && (
+          <motion.form initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            onSubmit={handleAdd} className="border border-white/[0.08] p-4 space-y-3 bg-white/[0.015]">
+            <p className="text-white/40 uppercase tracking-widest" style={lSt}>Новая привязка</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-white/20 uppercase tracking-widest mb-1" style={lSt}>Имя участника *</p>
+                <input required value={addName} onChange={e => setAddName(e.target.value)}
+                  placeholder="Roman Schwarz" className={iCls} style={iSt} />
+              </div>
+              <div>
+                <p className="text-white/20 uppercase tracking-widest mb-1" style={lSt}>Member ID (опц.)</p>
+                <input value={addMemberId} onChange={e => setAddMemberId(e.target.value)}
+                  placeholder="ID из вкладки Состав" className={iCls} style={iSt} />
+              </div>
+              <div>
+                <p className="text-white/20 uppercase tracking-widest mb-1" style={lSt}>Telegram ID</p>
+                <input value={addTgId} onChange={e => setAddTgId(e.target.value)}
+                  placeholder="123456789" className={iCls} style={iSt} />
+              </div>
+              <div>
+                <p className="text-white/20 uppercase tracking-widest mb-1" style={lSt}>TG Username</p>
+                <input value={addTgUser} onChange={e => setAddTgUser(e.target.value)}
+                  placeholder="roman_schwarz" className={iCls} style={iSt} />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Btn type="submit" className="bg-[#9b2335] hover:bg-[#b52a40] text-white">
+                <Plus size={13} /> Добавить
+              </Btn>
+              <Btn onClick={() => setShowAddForm(false)} className="border border-white/10 text-white/30 hover:text-white/60">
+                Отмена
+              </Btn>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
 
       {/* Table */}
-      <div className="border border-white/[0.06] overflow-x-auto">
-        {/* Head */}
-        <div className="min-w-[620px] grid px-4 py-2.5 border-b border-white/[0.05] bg-white/[0.02]"
-          style={{ gridTemplateColumns: "1.2fr 90px 160px 160px 60px" }}>
-          {["Участник / логин", "Роль", "Telegram", "Уведомления", ""].map(h => (
-            <span key={h} className="text-white/20 uppercase tracking-widest" style={lSt}>{h}</span>
-          ))}
+      {loading ? (
+        <div className="text-center py-8 text-white/20" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.7rem" }}>
+          Загрузка...
         </div>
+      ) : (
+        <div className="border border-white/[0.06] overflow-x-auto">
+          {/* Head */}
+          <div className="min-w-[620px] grid px-4 py-2.5 border-b border-white/[0.05] bg-white/[0.02]"
+            style={{ gridTemplateColumns: "1.4fr 90px 170px 160px 60px" }}>
+            {["Участник", "Роль", "Telegram", "Уведомления", ""].map(h => (
+              <span key={h} className="text-white/20 uppercase tracking-widest" style={lSt}>{h}</span>
+            ))}
+          </div>
 
-        {/* Rows */}
-        <div className="min-w-[620px] divide-y divide-white/[0.03]">
-          <AnimatePresence initial={false}>
-            {visible.map(acc => {
-              const memberName = getMemberName(acc.memberId);
-              const memberRole = getMemberRole(acc.memberId);
-              const isLinked = !!(acc.telegramId || acc.telegramUsername);
-              const activeNotifs = acc.tgNotifications ?? (isLinked ? ALL_NOTIFS : []);
+          {/* Rows */}
+          <div className="min-w-[620px] divide-y divide-white/[0.03]">
+            <AnimatePresence initial={false}>
+              {visible.map(link => {
+                const isLinked = !!(link.telegramId || link.telegramUsername);
+                const activeNotifs = link.tgNotifications ?? (isLinked ? ALL_NOTIFS : []);
 
-              return (
-                <motion.div key={acc.id}
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} layout
-                  className="group grid px-4 py-3 items-center hover:bg-white/[0.015] transition-colors"
-                  style={{ gridTemplateColumns: "1.2fr 90px 160px 160px 60px" }}>
+                return (
+                  <motion.div key={link.id}
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} layout
+                    className="group grid px-4 py-3 items-center hover:bg-white/[0.015] transition-colors"
+                    style={{ gridTemplateColumns: "1.4fr 90px 170px 160px 60px" }}>
 
-                  {/* Участник */}
-                  <div className="min-w-0 pr-3">
-                    <p className="text-white/75 truncate" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.78rem" }}>
-                      {memberName}
-                    </p>
-                    <p className="text-white/20 truncate" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.56rem" }}>
-                      @{acc.username}
-                    </p>
-                  </div>
-
-                  {/* Роль */}
-                  <div>
-                    {memberRole ? (
-                      <span className="px-1.5 py-0.5 border uppercase tracking-wider"
-                        style={{
-                          fontFamily: "'Oswald',sans-serif", fontSize: "0.44rem",
-                          borderColor: `${ROLE_COLORS_MAP[memberRole] ?? "#888"}30`,
-                          background:  `${ROLE_COLORS_MAP[memberRole] ?? "#888"}0d`,
-                          color: ROLE_COLORS_MAP[memberRole] ?? "#888",
-                        }}>
-                        {ROLE_LABELS_MAP[memberRole] ?? memberRole}
-                      </span>
-                    ) : <span className="text-white/12" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.55rem" }}>—</span>}
-                  </div>
-
-                  {/* TG */}
-                  <div className="min-w-0 pr-2">
-                    {isLinked ? (
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-1 h-1 rounded-full bg-[#22c55e] shrink-0" />
-                          <span className="text-[#22c55e]/70 truncate"
-                            style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.62rem" }}>
-                            {acc.telegramUsername ? `@${acc.telegramUsername}` : acc.telegramId}
-                          </span>
-                        </div>
-                        {acc.telegramId && (
-                          <p className="text-white/15 mt-0.5 pl-2.5" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.48rem" }}>
-                            ID: {acc.telegramId}
-                          </p>
-                        )}
-                        {acc.tgLinkedAt && (
-                          <p className="text-white/12 pl-2.5" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.45rem" }}>
-                            с {acc.tgLinkedAt}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1 h-1 rounded-full bg-white/12 shrink-0" />
-                        <span className="text-white/18" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.6rem" }}>Не привязан</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Notifications dots */}
-                  <div>
-                    {isLinked ? (
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap gap-1">
-                          {ALL_NOTIFS.map(k => {
-                            const on = activeNotifs.includes(k);
-                            return (
-                              <div key={k} className="w-1.5 h-1.5 rounded-full transition-all"
-                                title={`${TG_NOTIF_LABELS[k]}: ${on ? "включено" : "выключено"}`}
-                                style={{ background: on ? TG_NOTIF_COLORS[k] : "rgba(255,255,255,0.08)" }} />
-                            );
-                          })}
-                        </div>
-                        <p className="text-white/20" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.47rem" }}>
-                          {activeNotifs.length}/{ALL_NOTIFS.length} активных
+                    {/* Участник */}
+                    <div className="min-w-0 pr-3">
+                      <p className="text-white/75 truncate" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.78rem" }}>
+                        {link.memberName}
+                      </p>
+                      {link.accountUsername && (
+                        <p className="text-white/20 truncate" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.56rem" }}>
+                          @{link.accountUsername}
                         </p>
-                      </div>
-                    ) : (
-                      <span className="text-white/10" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.55rem" }}>—</span>
-                    )}
-                  </div>
+                      )}
+                    </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => setModal(acc)}
-                      className="p-1.5 border border-white/[0.07] text-white/20 hover:text-white/70 hover:border-white/25 transition-all"
-                      title="Редактировать привязку">
-                      <Edit3 size={12} />
-                    </button>
-                    {isLinked && (
-                      <button
-                        onClick={() => persistUpdate(acc.id, {
-                          telegramId: undefined, telegramUsername: undefined,
-                          tgLinkedAt: undefined, tgNotifications: undefined,
-                        })}
-                        className="p-1.5 border border-[#ff3366]/12 text-[#ff3366]/25 hover:text-[#ff3366]/70 hover:border-[#ff3366]/35 transition-all"
-                        title="Отвязать TG">
-                        <Unlink size={12} />
+                    {/* Роль */}
+                    <div>
+                      {link.memberRole ? (
+                        <span className="px-1.5 py-0.5 border uppercase tracking-wider"
+                          style={{
+                            fontFamily: "'Oswald',sans-serif", fontSize: "0.44rem",
+                            borderColor: `${ROLE_COLORS_MAP[link.memberRole] ?? "#888"}30`,
+                            background:  `${ROLE_COLORS_MAP[link.memberRole] ?? "#888"}0d`,
+                            color: ROLE_COLORS_MAP[link.memberRole] ?? "#888",
+                          }}>
+                          {ROLE_LABELS_MAP[link.memberRole] ?? link.memberRole}
+                        </span>
+                      ) : <span className="text-white/12" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.55rem" }}>—</span>}
+                    </div>
+
+                    {/* TG */}
+                    <div className="min-w-0 pr-2">
+                      {isLinked ? (
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-1 h-1 rounded-full bg-[#22c55e] shrink-0" />
+                            <span className="text-[#22c55e]/70 truncate"
+                              style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.62rem" }}>
+                              {link.telegramUsername ? `@${link.telegramUsername}` : link.telegramId}
+                            </span>
+                          </div>
+                          {link.telegramId && (
+                            <p className="text-white/15 mt-0.5 pl-2.5" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.48rem" }}>
+                              ID: {link.telegramId}
+                            </p>
+                          )}
+                          {link.tgLinkedAt && (
+                            <p className="text-white/12 pl-2.5" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.45rem" }}>
+                              с {link.tgLinkedAt}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1 h-1 rounded-full bg-white/12 shrink-0" />
+                          <span className="text-white/18" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.6rem" }}>Не привязан</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Notifications dots */}
+                    <div>
+                      {isLinked ? (
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap gap-1">
+                            {ALL_NOTIFS.map(k => {
+                              const on = activeNotifs.includes(k);
+                              return (
+                                <div key={k} className="w-1.5 h-1.5 rounded-full transition-all"
+                                  title={`${TG_NOTIF_LABELS[k]}: ${on ? "включено" : "выключено"}`}
+                                  style={{ background: on ? TG_NOTIF_COLORS[k] : "rgba(255,255,255,0.08)" }} />
+                              );
+                            })}
+                          </div>
+                          <p className="text-white/20" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.47rem" }}>
+                            {activeNotifs.length}/{ALL_NOTIFS.length} активных
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-white/10" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.55rem" }}>—</span>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 justify-end">
+                      <button onClick={() => setModal(link)}
+                        className="p-1.5 border border-white/[0.07] text-white/20 hover:text-white/70 hover:border-white/25 transition-all"
+                        title="Редактировать привязку">
+                        <Edit3 size={12} />
                       </button>
-                    )}
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
+                      <button
+                        onClick={() => persist(links.filter(l => l.id !== link.id))}
+                        className="p-1.5 border border-[#ff3366]/12 text-[#ff3366]/25 hover:text-[#ff3366]/70 hover:border-[#ff3366]/35 transition-all"
+                        title="Удалить">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
 
-          {visible.length === 0 && (
-            <div className="text-center py-10">
-              <Link2 size={26} className="text-white/6 mx-auto mb-3" />
-              <p className="text-white/15" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.7rem" }}>Нет результатов</p>
-            </div>
-          )}
+            {visible.length === 0 && (
+              <div className="text-center py-10">
+                <Link2 size={26} className="text-white/6 mx-auto mb-3" />
+                <p className="text-white/15" style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.7rem" }}>Нет результатов</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Notif legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1">
@@ -919,8 +1004,7 @@ function LinksSection() {
       <AnimatePresence>
         {modal && (
           <TgLinkModal
-            account={modal}
-            memberName={getMemberName(modal.memberId)}
+            link={modal}
             onSave={changes => persistUpdate(modal.id, changes)}
             onClose={() => setModal(null)}
           />
@@ -931,25 +1015,64 @@ function LinksSection() {
 }
 
 /* ════════════════════════════════════════════════════
-   SECTION: BOT CONFIG (minimal)
+   SECTION: BOT CONFIG (API-connected)
    ════════════════════════════════════════════════════ */
 
 function ConfigSection() {
-  const [cfg, setCfg] = useState<BotConfig>(() => load(K.config, DEFAULT_CONFIG));
+  const [cfg, setCfg] = useState<BotConfig>(DEFAULT_CONFIG);
   const [showToken, setShowToken] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [botInfo, setBotInfo] = useState<string | null>(null);
+  const [regStatus, setRegStatus] = useState<string | null>(null);
+  const [registering, setRegistering] = useState(false);
+
+  useEffect(() => {
+    API("config").then((data: BotConfig) => setCfg({ ...DEFAULT_CONFIG, ...data })).catch(() => {});
+  }, []);
+
+  const saveCfg = (next: BotConfig) => {
+    setCfg(next);
+    API("config", { method: "PUT", body: JSON.stringify(next) });
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    save(K.config, cfg);
+    API("config", { method: "PUT", body: JSON.stringify(cfg) });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
 
-  const genSecret = () => setCfg(c => ({
-    ...c, secretToken: Array.from({ length: 32 }, () => Math.random().toString(36)[2]).join("")
-  }));
+  const genSecret = () => saveCfg({
+    ...cfg, secretToken: Array.from({ length: 32 }, () => Math.random().toString(36)[2]).join("")
+  });
+
+  const handleCheckToken = async () => {
+    setBotInfo(null);
+    const r = await API("bot-info");
+    if (r?.ok && r.result?.username) {
+      setBotInfo(`✓ @${r.result.username} (ID: ${r.result.id})`);
+    } else {
+      setBotInfo(`✕ ${r?.description ?? r?.message ?? "Ошибка"}`);
+    }
+    setTimeout(() => setBotInfo(null), 6000);
+  };
+
+  const handleRegisterWebhook = async () => {
+    setRegistering(true);
+    setRegStatus(null);
+    const r = await API("register-webhook", {
+      method: "POST",
+      body: JSON.stringify({ url: cfg.webhookUrl, secretToken: cfg.secretToken }),
+    });
+    setRegistering(false);
+    if (r?.ok) {
+      setRegStatus("✓ Webhook зарегистрирован");
+    } else {
+      setRegStatus(`✕ ${r?.description ?? r?.message ?? "Ошибка"}`);
+    }
+    setTimeout(() => setRegStatus(null), 6000);
+  };
 
   return (
     <div className="space-y-4">
@@ -973,7 +1096,7 @@ function ConfigSection() {
             </div>
           </div>
         </div>
-        <button onClick={() => { const next = { ...cfg, enabled: !cfg.enabled }; setCfg(next); save(K.config, next); }}
+        <button onClick={() => saveCfg({ ...cfg, enabled: !cfg.enabled })}
           className={`transition-colors ${cfg.enabled ? "text-[#22c55e]" : "text-white/20 hover:text-white/40"}`}>
           {cfg.enabled ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
         </button>
@@ -984,15 +1107,34 @@ function ConfigSection() {
         {/* Token */}
         <div>
           <Label>Bot Token</Label>
-          <div className="relative">
-            <input type={showToken ? "text" : "password"} value={cfg.token}
-              onChange={e => setCfg(c => ({ ...c, token: e.target.value }))}
-              placeholder="1234567890:AAExxxxxxx..." className={`${iCls} pr-9`} style={iSt} />
-            <button type="button" onClick={() => setShowToken(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/15 hover:text-white/50 transition-colors">
-              {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input type={showToken ? "text" : "password"} value={cfg.token}
+                onChange={e => setCfg(c => ({ ...c, token: e.target.value }))}
+                placeholder="1234567890:AAExxxxxxx..." className={`${iCls} pr-9`} style={iSt} />
+              <button type="button" onClick={() => setShowToken(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/15 hover:text-white/50 transition-colors">
+                {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
+              </button>
+            </div>
+            <button type="button" onClick={handleCheckToken}
+              className="shrink-0 flex items-center gap-1.5 px-3 border border-white/[0.07] text-white/25 hover:text-white/55 transition-colors"
+              style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.58rem", textTransform: "uppercase" }}>
+              <Activity size={11} /> Проверить
             </button>
           </div>
+          <AnimatePresence>
+            {botInfo && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="mt-1.5"
+                style={{
+                  fontFamily: "'Oswald',sans-serif", fontSize: "0.62rem",
+                  color: botInfo.startsWith("✓") ? "#22c55e" : "#ff3366",
+                }}>
+                {botInfo}
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Username + Webhook */}
@@ -1012,7 +1154,8 @@ function ConfigSection() {
             <div className="flex">
               <input value={cfg.webhookUrl}
                 onChange={e => setCfg(c => ({ ...c, webhookUrl: e.target.value }))}
-                placeholder="https://..." className={`${iCls} flex-1`} style={iSt} />
+                placeholder="https://yourdomain.com/api/telegram/webhook"
+                className={`${iCls} flex-1`} style={iSt} />
               {cfg.webhookUrl && (
                 <button type="button" onClick={() => navigator.clipboard.writeText(cfg.webhookUrl)}
                   className="px-2.5 border border-l-0 border-white/[0.07] text-white/20 hover:text-white/50 transition-colors">
@@ -1044,9 +1187,14 @@ function ConfigSection() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 pt-1">
+        <div className="flex flex-wrap items-center gap-3 pt-1">
           <Btn type="submit" className="bg-[#9b2335] hover:bg-[#b52a40] text-white">
             <Save size={13} /> Сохранить
+          </Btn>
+          <Btn type="button" onClick={handleRegisterWebhook}
+            className={`border text-white/40 hover:text-white/80 transition-colors ${registering ? "border-white/10 opacity-50" : "border-white/10"}`}>
+            {registering ? <RefreshCw size={13} className="animate-spin" /> : <Link2 size={13} />}
+            Зарег. Webhook
           </Btn>
           <AnimatePresence>
             {saved && (
@@ -1056,6 +1204,15 @@ function ConfigSection() {
                 <span style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.65rem" }}>Сохранено</span>
               </motion.div>
             )}
+            {regStatus && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                style={{
+                  fontFamily: "'Oswald',sans-serif", fontSize: "0.62rem",
+                  color: regStatus.startsWith("✓") ? "#22c55e" : "#ff3366",
+                }}>
+                {regStatus}
+              </motion.p>
+            )}
           </AnimatePresence>
         </div>
       </form>
@@ -1064,17 +1221,32 @@ function ConfigSection() {
 }
 
 /* ════════════════════════════════════════════════════
-   SECTION: COMMANDS
+   SECTION: COMMANDS (API-connected)
    ════════════════════════════════════════════════════ */
 
 function CommandsSection() {
-  const [commands, setCommands] = useState<BotCommand[]>(() => load(K.commands, DEFAULT_COMMANDS));
+  const [commands, setCommands] = useState<BotCommand[]>([]);
+  const [cmdLoading, setCmdLoading] = useState(true);
   const [modal, setModal] = useState<{ open: boolean; cmd?: BotCommand }>({ open: false });
   const [filter, setFilter] = useState<CmdCategory | "all">("all");
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const persist = (next: BotCommand[]) => { setCommands(next); save(K.commands, next); };
+  useEffect(() => {
+    API("commands").then((data: BotCommand[]) => {
+      setCommands(Array.isArray(data) && data.length > 0 ? data : DEFAULT_COMMANDS);
+      setCmdLoading(false);
+      // Seed defaults on first load
+      if (!Array.isArray(data) || data.length === 0) {
+        API("commands", { method: "PUT", body: JSON.stringify(DEFAULT_COMMANDS) });
+      }
+    }).catch(() => { setCommands(DEFAULT_COMMANDS); setCmdLoading(false); });
+  }, []);
+
+  const persist = (next: BotCommand[]) => {
+    setCommands(next);
+    API("commands", { method: "PUT", body: JSON.stringify(next) });
+  };
 
   const handleSave = (cmd: BotCommand) => {
     persist(commands.some(c => c.id === cmd.id)
@@ -1250,17 +1422,25 @@ function CommandsSection() {
     </div>
   );
 }
-
 /* ════════════════════════════════════════════════════
    SECTION: TG ADMINS
    ════════════════════════════════════════════════════ */
 
 function AdminsSection() {
-  const [admins, setAdmins] = useState<TgAdmin[]>(() => load(K.admins, DEFAULT_ADMINS));
+  const [admins, setAdmins] = useState<TgAdmin[]>([]);
   const [modal, setModal] = useState<{ open: boolean; admin?: TgAdmin }>({ open: false });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const persist = (next: TgAdmin[]) => { setAdmins(next); save(K.admins, next); };
+  useEffect(() => {
+    API("admins").then((data: TgAdmin[]) => {
+      setAdmins(Array.isArray(data) && data.length > 0 ? data : DEFAULT_ADMINS);
+      if (!Array.isArray(data) || data.length === 0) {
+        API("admins", { method: "PUT", body: JSON.stringify(DEFAULT_ADMINS) });
+      }
+    }).catch(() => setAdmins(DEFAULT_ADMINS));
+  }, []);
+
+  const persist = (next: TgAdmin[]) => { setAdmins(next); API("admins", { method: "PUT", body: JSON.stringify(next) }); };
 
   const handleSave = (a: TgAdmin) => {
     persist(admins.some(x => x.id === a.id)
@@ -1428,7 +1608,11 @@ const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: str
 
 export function TelegramBotTab() {
   const [section, setSection] = useState<Section>("commands");
-  const cfg: BotConfig = load(K.config, DEFAULT_CONFIG);
+  const [liveCfg, setLiveCfg] = useState<BotConfig>(DEFAULT_CONFIG);
+
+  useEffect(() => {
+    API("config").then((d: BotConfig) => setLiveCfg({ ...DEFAULT_CONFIG, ...d })).catch(() => {});
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -1446,10 +1630,10 @@ export function TelegramBotTab() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`w-1.5 h-1.5 rounded-full ${cfg.enabled && cfg.token ? "bg-[#22c55e] shadow-[0_0_6px_#22c55e]" : "bg-white/12"}`} />
-          <span className={cfg.enabled && cfg.token ? "text-[#22c55e]/60" : "text-white/20"}
+          <div className={`w-1.5 h-1.5 rounded-full ${liveCfg.enabled && liveCfg.token ? "bg-[#22c55e] shadow-[0_0_6px_#22c55e]" : "bg-white/12"}`} />
+          <span className={liveCfg.enabled && liveCfg.token ? "text-[#22c55e]/60" : "text-white/20"}
             style={{ fontFamily: "'Oswald',sans-serif", fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-            {cfg.enabled && cfg.token ? "Активен" : "Не настроен"}
+            {liveCfg.enabled && liveCfg.token ? "Активен" : "Не настроен"}
           </span>
         </div>
       </div>

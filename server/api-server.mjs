@@ -515,6 +515,253 @@ const DEFAULT_NAV_ITEMS = [
   { id: "contacts", label: "Контакты", path: "/contacts", visible: true },
 ];
 
+/* ─────────────────────────────────────────
+   TELEGRAM BOT
+───────────────────────────────────────── */
+
+async function tgApi(token, method, params = {}) {
+  const r = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  return r.json();
+}
+
+async function tgSend(token, chatId, text) {
+  return tgApi(token, "sendMessage", { chat_id: chatId, text, parse_mode: "HTML" });
+}
+
+function getTgData(db) {
+  if (!db.tgBot) db.tgBot = {};
+  if (!db.tgBot.config) db.tgBot.config = { token: "", botUsername: "", enabled: false, webhookUrl: "", secretToken: "" };
+  if (!Array.isArray(db.tgBot.commands)) db.tgBot.commands = [];
+  if (!Array.isArray(db.tgBot.admins)) db.tgBot.admins = [];
+  if (!Array.isArray(db.tgBot.links)) db.tgBot.links = [];
+  if (!db.tgBot.memberStatus) db.tgBot.memberStatus = {};
+  return db.tgBot;
+}
+
+app.get("/api/telegram/config", (_req, res) => {
+  const db = readDb();
+  res.json(getTgData(db).config);
+});
+
+app.put("/api/telegram/config", (req, res) => {
+  const db = readDb();
+  const tg = getTgData(db);
+  tg.config = { ...tg.config, ...(req.body || {}) };
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.get("/api/telegram/commands", (_req, res) => {
+  const db = readDb();
+  res.json(getTgData(db).commands);
+});
+
+app.put("/api/telegram/commands", (req, res) => {
+  const db = readDb();
+  getTgData(db).commands = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.get("/api/telegram/admins", (_req, res) => {
+  const db = readDb();
+  res.json(getTgData(db).admins);
+});
+
+app.put("/api/telegram/admins", (req, res) => {
+  const db = readDb();
+  getTgData(db).admins = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.get("/api/telegram/links", (_req, res) => {
+  const db = readDb();
+  res.json(getTgData(db).links);
+});
+
+app.put("/api/telegram/links", (req, res) => {
+  const db = readDb();
+  getTgData(db).links = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* Check bot token */
+app.get("/api/telegram/bot-info", async (_req, res) => {
+  const db = readDb();
+  const { token } = getTgData(db).config;
+  if (!token) return res.json({ ok: false, message: "Токен не задан" });
+  try {
+    const result = await tgApi(token, "getMe");
+    res.json(result);
+  } catch {
+    res.json({ ok: false, message: "Запрос к Telegram API не удался" });
+  }
+});
+
+/* Register webhook with Telegram */
+app.post("/api/telegram/register-webhook", async (req, res) => {
+  const db = readDb();
+  const tg = getTgData(db);
+  if (!tg.config.token) return res.json({ ok: false, message: "Токен не задан" });
+  const webhookUrl = (req.body?.url || tg.config.webhookUrl || "").trim();
+  if (!webhookUrl) return res.json({ ok: false, message: "Webhook URL не задан" });
+  try {
+    const params = { url: webhookUrl };
+    const secret = (req.body?.secretToken || tg.config.secretToken || "").trim();
+    if (secret) params.secret_token = secret;
+    const result = await tgApi(tg.config.token, "setWebhook", params);
+    if (result.ok) {
+      tg.config.webhookUrl = webhookUrl;
+      writeDb(db);
+      console.log(`[telegram] webhook registered: ${webhookUrl}`);
+    }
+    res.json(result);
+  } catch (err) {
+    res.json({ ok: false, message: err.message });
+  }
+});
+
+/* Send message (admin broadcast) */
+app.post("/api/telegram/send", async (req, res) => {
+  const db = readDb();
+  const { token } = getTgData(db).config;
+  if (!token) return res.status(400).json({ ok: false, message: "Токен не задан" });
+  const { chatId, text, chatIds } = req.body || {};
+  if (!text) return res.status(400).json({ ok: false, message: "text required" });
+  try {
+    if (Array.isArray(chatIds) && chatIds.length > 0) {
+      const results = await Promise.allSettled(chatIds.map((id) => tgSend(token, id, text)));
+      const sent = results.filter((r) => r.status === "fulfilled").length;
+      res.json({ ok: true, sent, total: chatIds.length });
+    } else if (chatId) {
+      res.json(await tgSend(token, chatId, text));
+    } else {
+      res.status(400).json({ ok: false, message: "chatId или chatIds обязателен" });
+    }
+  } catch (err) {
+    res.json({ ok: false, message: err.message });
+  }
+});
+
+/* Telegram webhook — receives updates from Telegram */
+app.post("/api/telegram/webhook", async (req, res) => {
+  res.json({ ok: true }); // Always acknowledge immediately
+
+  const db = readDb();
+  const tg = getTgData(db);
+
+  // Validate secret token if configured
+  if (tg.config.secretToken) {
+    const incoming = req.headers["x-telegram-bot-api-secret-token"];
+    if (incoming !== tg.config.secretToken) {
+      console.log("[telegram] webhook: invalid secret token, ignoring");
+      return;
+    }
+  }
+
+  if (!tg.config.token || !tg.config.enabled) return;
+
+  const message = req.body?.message;
+  if (!message?.text) return;
+
+  const chatId = message.chat.id;
+  const fromId = String(message.from?.id ?? "");
+  const text = message.text.trim();
+  const fromUsername = message.from?.username ?? "";
+
+  if (!text.startsWith("/")) return;
+
+  const [rawCmd, ...args] = text.split(/\s+/);
+  const cmd = rawCmd.replace(/@\w+$/, "").toLowerCase();
+
+  // Re-read db for fresh data
+  const freshDb = readDb();
+  const freshTg = getTgData(freshDb);
+  const link = freshTg.links.find((l) => l.telegramId && String(l.telegramId) === fromId);
+  const members = freshDb.adminSnapshot?.members ?? [];
+  const member = link ? members.find((m) => m.id === link.memberId) : null;
+
+  const ROLE_LABELS = {
+    owner: "Owner", dep_owner: "Dep.Owner", close: "Close",
+    old: "Old", main: "Main", academy: "Academy", veteran: "Ветеран", member: "Участник",
+  };
+
+  const send = (txt) => tgSend(freshTg.config.token, chatId, txt)
+    .catch((e) => console.error("[telegram] send error:", e.message));
+
+  try {
+    if (cmd === "/start" || cmd === "/старт") {
+      if (member) {
+        await send(`👋 <b>С возвращением, ${member.name}!</b>\nРоль: <b>${ROLE_LABELS[member.role] ?? member.role}</b>\n\nИспользуйте /помощь для списка команд.`);
+      } else {
+        await send(`👋 <b>Добро пожаловать в Schwarz Family Bot!</b>\n\nДля привязки вашего Telegram к профилю обратитесь к администратору семьи.\n\nВаш Telegram ID: <code>${fromId}</code>${fromUsername ? `\nUsername: @${fromUsername}` : ""}`);
+      }
+    } else if (cmd === "/помощь" || cmd === "/help") {
+      const list = freshTg.commands.filter((c) => c.enabled).map((c) => `${c.command} — ${c.description}`).join("\n");
+      await send(`📋 <b>Доступные команды:</b>\n\n${list || "Нет активных команд"}`);
+    } else if (cmd === "/профиль") {
+      if (!member) { await send("❌ Ваш Telegram не привязан к профилю.\nОбратитесь к администратору."); return; }
+      const contractsDone = (freshDb.contracts ?? []).filter((c) => !c.available && c.closedBy === link.memberId).length;
+      await send(`👤 <b>${member.name}</b>\nРоль: <b>${ROLE_LABELS[member.role] ?? member.role}</b>\nВ семье с: ${member.joinDate}\nВыполнено контрактов: <b>${contractsDone}</b>${member.badges?.length ? `\nЗначки: ${member.badges.join(", ")}` : ""}`);
+    } else if (cmd === "/казна") {
+      const c = freshDb.contracts ?? [];
+      await send(`💰 <b>Казна Schwarz Family</b>\n\nОткрытых контрактов: <b>${c.filter((x) => x.available).length}</b>\nЗакрытых: <b>${c.filter((x) => !x.available).length}</b>`);
+    } else if (cmd === "/контракты") {
+      const open = (freshDb.contracts ?? []).filter((c) => c.available);
+      if (!open.length) { await send("📋 Нет открытых контрактов."); return; }
+      const list = open.slice(0, 10).map((c) => `• <b>${c.title}</b>${c.reward ? ` — ${c.reward}` : ""}`).join("\n");
+      await send(`📋 <b>Открытые контракты (${open.length}):</b>\n\n${list}`);
+    } else if (cmd === "/топ") {
+      const order = { owner: 0, dep_owner: 1, close: 2, old: 3, main: 4, academy: 5, veteran: 6, member: 7 };
+      const top = [...members].filter((m) => m.active)
+        .sort((a, b) => (order[a.role] ?? 9) - (order[b.role] ?? 9)).slice(0, 10);
+      const list = top.map((m, i) => `${i + 1}. ${m.name} — ${ROLE_LABELS[m.role] ?? m.role}`).join("\n");
+      await send(`🏆 <b>Schwarz Family:</b>\n\n${list}`);
+    } else if (cmd === "/объявления") {
+      const ann = freshDb.adminSnapshot?.announcements ?? [];
+      if (!ann.length) { await send("📢 Объявлений нет."); return; }
+      const list = ann.slice(0, 3).map((a) => `📌 <b>${a.title ?? "Объявление"}</b>\n${(a.text ?? a.content ?? "").slice(0, 200)}`).join("\n\n");
+      await send(`📢 <b>Последние объявления:</b>\n\n${list}`);
+    } else if (cmd === "/статус") {
+      const target = args.join(" ");
+      const who = target ? members.find((m) => m.name.toLowerCase().includes(target.toLowerCase())) : member;
+      if (!who) { await send("❌ Участник не найден."); return; }
+      const s = freshTg.memberStatus[who.id] ?? { status: "offline" };
+      const emoji = s.status === "online" ? "🟢" : s.status === "busy" ? "🟡" : "⚫";
+      await send(`${emoji} <b>${who.name}</b>: ${s.status === "online" ? "Онлайн" : s.status === "busy" ? "Занят" : "Офлайн"}`);
+    } else if (cmd === "/онлайн") {
+      if (!member) { await send("❌ Ваш Telegram не привязан к профилю."); return; }
+      freshTg.memberStatus[link.memberId] = { status: "online", since: new Date().toISOString() };
+      writeDb(freshDb);
+      await send(`🟢 <b>${member.name}</b> теперь онлайн!`);
+    } else if (cmd === "/офлайн") {
+      if (!member) { await send("❌ Ваш Telegram не привязан к профилю."); return; }
+      freshTg.memberStatus[link.memberId] = { status: "offline", since: new Date().toISOString() };
+      writeDb(freshDb);
+      await send(`⚫ <b>${member.name}</b> теперь офлайн.`);
+    } else if (cmd === "/занят") {
+      if (!member) { await send("❌ Ваш Telegram не привязан к профилю."); return; }
+      const mins = Math.max(1, Math.min(480, parseInt(args[0] ?? "30") || 30));
+      freshTg.memberStatus[link.memberId] = {
+        status: "busy", since: new Date().toISOString(),
+        busyUntil: new Date(Date.now() + mins * 60_000).toISOString(),
+      };
+      writeDb(freshDb);
+      await send(`🟡 <b>${member.name}</b> занят на ${mins} мин.`);
+    } else {
+      await send("❓ Неизвестная команда. /помощь — список доступных команд.");
+    }
+  } catch (err) {
+    console.error("[telegram] command handler error:", err.message);
+  }
+});
+
 // Serve built frontend (production)
 if (fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR));
