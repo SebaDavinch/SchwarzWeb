@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 /* ═══════════════════════════════════════════════
    ROLE RANKS
@@ -459,6 +459,7 @@ const defaultAchievements: AchievementDef[] = [
    STORAGE HELPERS
    ═══════════════════════════════════════════════ */
 
+// localStorage helpers — used only for achievements & notifications
 function loadData<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(`schwarz_${key}`);
@@ -472,23 +473,24 @@ function saveData<T>(key: string, data: T) {
   localStorage.setItem(`schwarz_${key}`, JSON.stringify(data));
 }
 
+// API helper — fire-and-forget PUT for list endpoints
+function apiPut(path: string, data: unknown) {
+  fetch(path, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  }).catch((e) => console.error(`[cabinet] PUT ${path} failed:`, e));
+}
+
 /* ═══════════════════════════════════════════════
    HOOK
    ═══════════════════════════════════════════════ */
 
 export function useCabinetData() {
-  const [vehicles, setVehiclesState] = useState<Vehicle[]>(() =>
-    loadData("vehicles", defaultVehicles)
-  );
-  const [contracts, setContractsState] = useState<Contract[]>(() =>
-    loadData("contracts", defaultContracts)
-  );
-  const [upgrades, setUpgradesState] = useState<Upgrade[]>(() =>
-    loadData("upgrades", defaultUpgrades)
-  );
-  const [infrastructure, setInfrastructureState] = useState<InfrastructureItem[]>(
-    () => loadData("infrastructure", defaultInfrastructure)
-  );
+  const [vehicles, setVehiclesState] = useState<Vehicle[]>([]);
+  const [contracts, setContractsState] = useState<Contract[]>([]);
+  const [upgrades, setUpgradesState] = useState<Upgrade[]>([]);
+  const [infrastructure, setInfrastructureState] = useState<InfrastructureItem[]>([]);
   const [achievementDefs, setAchievementDefsState] = useState<AchievementDef[]>(
     () => loadData("achievement_defs", defaultAchievements)
   );
@@ -499,10 +501,26 @@ export function useCabinetData() {
     () => loadData("cabinet_notifications", [])
   );
 
+  // Load from API on mount
+  useEffect(() => {
+    fetch("/api/vehicles").then(r => r.json())
+      .then((d: Vehicle[]) => setVehiclesState(Array.isArray(d) && d.length ? d : defaultVehicles))
+      .catch(() => setVehiclesState(defaultVehicles));
+    fetch("/api/contracts").then(r => r.json())
+      .then((d: Contract[]) => setContractsState(Array.isArray(d) && d.length ? d : defaultContracts))
+      .catch(() => setContractsState(defaultContracts));
+    fetch("/api/upgrades").then(r => r.json())
+      .then((d: Upgrade[]) => setUpgradesState(Array.isArray(d) && d.length ? d : defaultUpgrades))
+      .catch(() => setUpgradesState(defaultUpgrades));
+    fetch("/api/infrastructure").then(r => r.json())
+      .then((d: InfrastructureItem[]) => setInfrastructureState(Array.isArray(d) && d.length ? d : defaultInfrastructure))
+      .catch(() => setInfrastructureState(defaultInfrastructure));
+  }, []);
+
   /* --- Vehicles --- */
   const setVehicles = (v: Vehicle[]) => {
     setVehiclesState(v);
-    saveData("vehicles", v);
+    apiPut("/api/vehicles", v);
   };
   const addVehicle = (data: Omit<Vehicle, "id" | "addedAt">) => {
     const v: Vehicle = {
@@ -521,7 +539,7 @@ export function useCabinetData() {
   /* --- Contracts --- */
   const setContracts = (c: Contract[]) => {
     setContractsState(c);
-    saveData("contracts", c);
+    apiPut("/api/contracts", c);
   };
   const addContract = (data: Omit<Contract, "id" | "createdAt" | "participants">) => {
     const c: Contract = {
@@ -557,7 +575,7 @@ export function useCabinetData() {
   };
 
   const closeContract = (contractId: string, closerIds: string[]) => {
-    const currentContracts = loadData<Contract[]>("contracts", []);
+    const currentContracts = contracts;
     const updatedContracts = currentContracts.map((c) =>
       c.id === contractId
         ? {
@@ -569,11 +587,11 @@ export function useCabinetData() {
         : c
     );
     setContractsState(updatedContracts);
-    saveData("contracts", updatedContracts);
+    apiPut("/api/contracts", updatedContracts);
 
     // Award contract achievements
-    const currentUAs = loadData<UserAchievement[]>("user_achievements", []);
-    const currentAchDefs = loadData<AchievementDef[]>("achievement_defs", defaultAchievements);
+    const currentUAs = userAchievements;
+    const currentAchDefs = achievementDefs;
     const newUAs: UserAchievement[] = [];
 
     closerIds.forEach((memberId) => {
@@ -613,7 +631,7 @@ export function useCabinetData() {
   /* --- Upgrades --- */
   const setUpgrades = (u: Upgrade[]) => {
     setUpgradesState(u);
-    saveData("upgrades", u);
+    apiPut("/api/upgrades", u);
   };
   const addUpgrade = (data: Omit<Upgrade, "id">) => {
     const u: Upgrade = { ...data, id: `u_${Date.now()}` };
@@ -628,7 +646,7 @@ export function useCabinetData() {
   /* --- Infrastructure --- */
   const setInfrastructure = (i: InfrastructureItem[]) => {
     setInfrastructureState(i);
-    saveData("infrastructure", i);
+    apiPut("/api/infrastructure", i);
   };
   const addInfrastructure = (data: Omit<InfrastructureItem, "id" | "addedAt">) => {
     const item: InfrastructureItem = {

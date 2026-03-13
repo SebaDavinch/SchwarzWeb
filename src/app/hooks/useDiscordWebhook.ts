@@ -2,8 +2,6 @@
    DISCORD WEBHOOK — уведомления в Discord
    ═══════════════════════════════════════════════ */
 
-const STORAGE_KEY = "schwarz_admin_discordWebhook";
-const EVENTS_KEY = "schwarz_admin_webhookEvents";
 const LOG_KEY = "schwarz_admin_webhookLog";
 
 export interface WebhookConfig {
@@ -44,37 +42,47 @@ const defaultEvents: WebhookEvents = {
   momentAdded: false,
 };
 
-export function getWebhookConfig(): WebhookConfig {
+export const DEFAULT_WEBHOOK_CONFIG: WebhookConfig = {
+  url: "",
+  enabled: false,
+  username: "Schwarz Family",
+  avatarUrl: "",
+};
+
+export const DEFAULT_WEBHOOK_EVENTS: WebhookEvents = { ...defaultEvents };
+
+export async function getWebhookConfig(): Promise<WebhookConfig> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw
-      ? JSON.parse(raw)
-      : {
-          url: "",
-          enabled: false,
-          username: "Schwarz Family",
-          avatarUrl: "",
-        };
+    const r = await fetch("/api/webhooks/config");
+    return r.ok ? await r.json() : DEFAULT_WEBHOOK_CONFIG;
   } catch {
-    return { url: "", enabled: false, username: "Schwarz Family", avatarUrl: "" };
+    return DEFAULT_WEBHOOK_CONFIG;
   }
 }
 
-export function saveWebhookConfig(config: WebhookConfig) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+export async function saveWebhookConfig(config: WebhookConfig) {
+  await fetch("/api/webhooks/config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
 }
 
-export function getWebhookEvents(): WebhookEvents {
+export async function getWebhookEvents(): Promise<WebhookEvents> {
   try {
-    const raw = localStorage.getItem(EVENTS_KEY);
-    return raw ? { ...defaultEvents, ...JSON.parse(raw) } : defaultEvents;
+    const r = await fetch("/api/webhooks/events");
+    return r.ok ? { ...defaultEvents, ...(await r.json()) } : defaultEvents;
   } catch {
     return defaultEvents;
   }
 }
 
-export function saveWebhookEvents(events: WebhookEvents) {
-  localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+export async function saveWebhookEvents(events: WebhookEvents) {
+  await fetch("/api/webhooks/events", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(events),
+  });
 }
 
 /* ═══════════════════════════════════════════════
@@ -126,7 +134,7 @@ function hexToDecimal(hex: string): number {
 }
 
 async function sendWebhook(embed: DiscordEmbed, eventKey: string, eventLabel: string) {
-  const config = getWebhookConfig();
+  const config = await getWebhookConfig();
   if (!config.enabled || !config.url.trim()) return;
 
   if (
@@ -169,8 +177,8 @@ async function sendWebhook(embed: DiscordEmbed, eventKey: string, eventLabel: st
    PUBLIC API — вызывается из компонентов
    ═══════════════════════════════════════════════ */
 
-export function notifyNewApplication(nickname: string, discord: string) {
-  const events = getWebhookEvents();
+export async function notifyNewApplication(nickname: string, discord: string) {
+  const events = await getWebhookEvents();
   if (!events.newApplication) return;
 
   sendWebhook(
@@ -187,12 +195,12 @@ export function notifyNewApplication(nickname: string, discord: string) {
   );
 }
 
-export function notifyApplicationVerdict(
+export async function notifyApplicationVerdict(
   nickname: string,
   status: "accepted" | "rejected",
   reviewedBy: string
 ) {
-  const events = getWebhookEvents();
+  const events = await getWebhookEvents();
   if (!events.applicationVerdict) return;
 
   const isAccepted = status === "accepted";
@@ -209,8 +217,8 @@ export function notifyApplicationVerdict(
   );
 }
 
-export function notifyMemberAdded(name: string, role: string) {
-  const events = getWebhookEvents();
+export async function notifyMemberAdded(name: string, role: string) {
+  const events = await getWebhookEvents();
   if (!events.memberAdded) return;
 
   const roleLabels: Record<string, string> = {
@@ -233,8 +241,8 @@ export function notifyMemberAdded(name: string, role: string) {
   );
 }
 
-export function notifyMemberRemoved(name: string) {
-  const events = getWebhookEvents();
+export async function notifyMemberRemoved(name: string) {
+  const events = await getWebhookEvents();
   if (!events.memberRemoved) return;
 
   sendWebhook(
@@ -249,8 +257,8 @@ export function notifyMemberRemoved(name: string) {
   );
 }
 
-export function notifyNewAnnouncement(title: string, priority: string) {
-  const events = getWebhookEvents();
+export async function notifyNewAnnouncement(title: string, priority: string) {
+  const events = await getWebhookEvents();
   if (!events.newAnnouncement) return;
 
   const priorityLabels: Record<string, string> = {
@@ -277,12 +285,12 @@ export function notifyNewAnnouncement(title: string, priority: string) {
   );
 }
 
-export function notifyLeadershipChange(
+export async function notifyLeadershipChange(
   action: "add" | "edit" | "delete",
   faction: string,
   leader: string
 ) {
-  const events = getWebhookEvents();
+  const events = await getWebhookEvents();
   if (!events.leadershipChange) return;
 
   const actionLabels = {
@@ -303,8 +311,8 @@ export function notifyLeadershipChange(
   );
 }
 
-export function notifyNewsPublished(title: string, category: string, author: string) {
-  const events = getWebhookEvents();
+export async function notifyNewsPublished(title: string, category: string, author: string) {
+  const events = await getWebhookEvents();
   if (!events.newsPublished) return;
 
   sendWebhook(
@@ -323,8 +331,8 @@ export function notifyNewsPublished(title: string, category: string, author: str
   );
 }
 
-export function notifyMomentAdded(title: string, category: string) {
-  const events = getWebhookEvents();
+export async function notifyMomentAdded(title: string, category: string) {
+  const events = await getWebhookEvents();
   if (!events.momentAdded) return;
 
   sendWebhook(

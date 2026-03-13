@@ -762,6 +762,88 @@ app.post("/api/telegram/webhook", async (req, res) => {
   }
 });
 
+/* ─────────────────────────────────────────
+   VEHICLES
+───────────────────────────────────────── */
+
+app.get("/api/vehicles", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.vehicles) ? db.vehicles : []);
+});
+app.put("/api/vehicles", (req, res) => {
+  const db = readDb();
+  db.vehicles = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   UPGRADES
+───────────────────────────────────────── */
+
+app.get("/api/upgrades", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.upgrades) ? db.upgrades : []);
+});
+app.put("/api/upgrades", (req, res) => {
+  const db = readDb();
+  db.upgrades = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   INFRASTRUCTURE
+───────────────────────────────────────── */
+
+app.get("/api/infrastructure", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.infrastructure) ? db.infrastructure : []);
+});
+app.put("/api/infrastructure", (req, res) => {
+  const db = readDb();
+  db.infrastructure = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   CONTRACTS (bulk replace for useCabinetData hook)
+───────────────────────────────────────── */
+
+app.put("/api/contracts", (req, res) => {
+  const db = readDb();
+  db.contracts = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   DISCORD WEBHOOK SETTINGS
+───────────────────────────────────────── */
+
+app.get("/api/webhooks/config", (_req, res) => {
+  const db = readDb();
+  res.json(db.webhookConfig ?? { url: "", enabled: false, username: "Schwarz Family", avatarUrl: "" });
+});
+app.put("/api/webhooks/config", (req, res) => {
+  const db = readDb();
+  db.webhookConfig = req.body;
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.get("/api/webhooks/events", (_req, res) => {
+  const db = readDb();
+  res.json(db.webhookEvents ?? {});
+});
+app.put("/api/webhooks/events", (req, res) => {
+  const db = readDb();
+  db.webhookEvents = req.body;
+  writeDb(db);
+  res.json({ ok: true });
+});
+
 // Serve built frontend (production)
 if (fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR));

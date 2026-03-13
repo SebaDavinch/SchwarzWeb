@@ -69,6 +69,8 @@ import {
   notifyMemberRemoved,
   notifyNewAnnouncement,
   notifyLeadershipChange,
+  DEFAULT_WEBHOOK_CONFIG,
+  DEFAULT_WEBHOOK_EVENTS,
   type WebhookConfig,
   type WebhookEvents,
 } from "../hooks/useDiscordWebhook";
@@ -2337,18 +2339,23 @@ function SettingsTab() {
   const [saved, setSaved] = useState(false);
 
   // Webhook state
-  const [whConfig, setWhConfig] = useState<WebhookConfig>(getWebhookConfig);
-  const [whEvents, setWhEvents] = useState<WebhookEvents>(getWebhookEvents);
+  const [whConfig, setWhConfig] = useState<WebhookConfig>(DEFAULT_WEBHOOK_CONFIG);
+  const [whEvents, setWhEvents] = useState<WebhookEvents>(DEFAULT_WEBHOOK_EVENTS);
   const [testingWh, setTestingWh] = useState(false);
   const [testResult, setTestResult] = useState<null | boolean>(null);
 
-  const handleSave = () => {
+  useEffect(() => {
+    getWebhookConfig().then(setWhConfig).catch(() => {});
+    getWebhookEvents().then(setWhEvents).catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
     saveState("promoCode", promoCode);
     saveState("promoReward", promoReward);
     saveState("discordLink", discordLink);
     saveState("twitchLink", twitchLink);
-    saveWebhookConfig(whConfig);
-    saveWebhookEvents(whEvents);
+    await saveWebhookConfig(whConfig);
+    await saveWebhookEvents(whEvents);
     addAuditLog("Настройки обновлены", "settings", "Промокод, ссылки, вебхуки");
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);

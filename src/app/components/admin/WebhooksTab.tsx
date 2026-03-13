@@ -24,6 +24,8 @@ import {
   getWebhookLog,
   clearWebhookLog,
   testWebhook,
+  DEFAULT_WEBHOOK_CONFIG,
+  DEFAULT_WEBHOOK_EVENTS,
   type WebhookConfig,
   type WebhookEvents,
   type WebhookLogEntry,
@@ -155,8 +157,8 @@ function LogRow({ entry }: { entry: WebhookLogEntry }) {
    ═══════════════════════════════════════════════ */
 
 export function WebhooksTab() {
-  const [config, setConfig] = useState<WebhookConfig>(getWebhookConfig);
-  const [events, setEvents] = useState<WebhookEvents>(getWebhookEvents);
+  const [config, setConfig] = useState<WebhookConfig>(DEFAULT_WEBHOOK_CONFIG);
+  const [events, setEvents] = useState<WebhookEvents>(DEFAULT_WEBHOOK_EVENTS);
   const [log, setLog] = useState<WebhookLogEntry[]>(getWebhookLog);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<null | boolean>(null);
@@ -167,15 +169,20 @@ export function WebhooksTab() {
     setLog(getWebhookLog());
   }, []);
 
+  // Load config + events from API on mount
+  useEffect(() => {
+    getWebhookConfig().then(setConfig).catch(() => {});
+    getWebhookEvents().then(setEvents).catch(() => {});
+  }, []);
+
   // auto-refresh log
   useEffect(() => {
     const t = setInterval(refreshLog, 5000);
     return () => clearInterval(t);
   }, [refreshLog]);
 
-  const handleSave = () => {
-    saveWebhookConfig(config);
-    saveWebhookEvents(events);
+  const handleSave = async () => {
+    await Promise.all([saveWebhookConfig(config), saveWebhookEvents(events)]);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
