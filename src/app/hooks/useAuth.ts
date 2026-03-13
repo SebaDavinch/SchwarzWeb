@@ -4,6 +4,29 @@ import { useState } from "react";
    TYPES
    ═══════════════════════════════════════════════ */
 
+export type TgNotifKey =
+  | "contracts"
+  | "announcements"
+  | "mentions"
+  | "treasury"
+  | "applications";
+
+export const TG_NOTIF_LABELS: Record<TgNotifKey, string> = {
+  contracts:     "Контракты",
+  announcements: "Объявления",
+  mentions:      "Упоминания",
+  treasury:      "Казна",
+  applications:  "Заявки",
+};
+
+export const TG_NOTIF_COLORS: Record<TgNotifKey, string> = {
+  contracts:     "#f59e0b",
+  announcements: "#9b2335",
+  mentions:      "#a78bfa",
+  treasury:      "#22c55e",
+  applications:  "#38bdf8",
+};
+
 export interface Account {
   id: string;
   username: string;
@@ -11,9 +34,16 @@ export interface Account {
   memberId: string;
   createdAt: string;
   avatarDataUrl?: string;
+  coverDataUrl?: string;
   realName?: string;
   birthday?: string; // "YYYY-MM-DD"
   bio?: string;
+  specializations?: string[];
+  // Telegram
+  telegramId?: string;
+  telegramUsername?: string;
+  tgLinkedAt?: string;
+  tgNotifications?: TgNotifKey[];
 }
 
 export interface AuthSession {

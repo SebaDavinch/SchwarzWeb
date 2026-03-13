@@ -58,6 +58,7 @@ import { NavbarEditor } from "../components/admin/NavbarEditor";
 import { PagesEditor } from "../components/admin/PagesEditor";
 import { ApplicationsTab } from "../components/admin/ApplicationsTab";
 import { PollsTab } from "../components/admin/PollsTab";
+import { TelegramBotTab } from "../components/admin/TelegramBotTab";
 import {
   getWebhookConfig,
   saveWebhookConfig,
@@ -88,7 +89,8 @@ type Tab =
   | "settings"
   | "polls"
   | "auditlog"
-  | "accounts";
+  | "accounts"
+  | "telegram_bot";
 
 /* Permission-to-tab mapping */
 const tabPermissions: Record<Tab, string | null> = {
@@ -104,6 +106,7 @@ const tabPermissions: Record<Tab, string | null> = {
   polls: "manage_settings",
   auditlog: "manage_settings",
   accounts: "all",
+  telegram_bot: "manage_settings",
 };
 
 interface Member {
@@ -481,6 +484,7 @@ const sidebarItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] =
   { id: "auditlog", label: "Аудит-лог", icon: ClipboardList },
   { id: "settings", label: "Настройки", icon: Settings },
   { id: "accounts", label: "Аккаунты", icon: KeyRound },
+  { id: "telegram_bot", label: "Telegram Bot", icon: Send },
 ];
 
 function Sidebar({
@@ -3139,6 +3143,7 @@ export function AdminPage() {
               {activeTab === "auditlog" && <AuditLogTab />}
               {activeTab === "settings" && <SettingsTab />}
               {activeTab === "accounts" && <AccountsTab currentAccountId={currentAccount?.id ?? ""} />}
+              {activeTab === "telegram_bot" && <TelegramBotTab />}
             </motion.div>
           </AnimatePresence>
         </div>
