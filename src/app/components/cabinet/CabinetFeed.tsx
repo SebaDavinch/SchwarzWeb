@@ -1,11 +1,15 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "motion/react";
 import {
   Megaphone, Newspaper, AlertTriangle, Info, CheckCircle2,
-  Pin, ChevronRight, User, Clock, Tag,
+  Pin, ChevronRight, User, Clock, Tag, Cake,
 } from "lucide-react";
 import { Link } from "react-router";
 import type { CabinetNotification } from "../../hooks/useCabinetData";
+import {
+  getAllBirthdays, getDaysUntilBirthday, isBirthdayToday, formatBirthdayRu, getAge,
+  getZodiacSign, getZodiacEmoji,
+} from "../../hooks/useBirthdays";
 
 interface Announcement {
   id: string; title: string; text: string;
@@ -79,6 +83,17 @@ function UserAvatar({ url, name }: { url?: string; name?: string }) {
 }
 
 export function CabinetFeed({ notifications, memberName, avatarUrl }: Props) {
+  // Birthdays for internal sidebar widget
+  const upcomingBirthdays = useMemo(() => {
+    const all = getAllBirthdays();
+    return all
+      .map((p) => ({ ...p, days: getDaysUntilBirthday(p.birthday) }))
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 6);
+  }, []);
+
+  const todayBirthdays = upcomingBirthdays.filter((p) => isBirthdayToday(p.birthday));
+
   const feed = useMemo<FeedItem[]>(() => {
     const items: FeedItem[] = [];
     try {
@@ -111,7 +126,53 @@ export function CabinetFeed({ notifications, memberName, avatarUrl }: Props) {
   const regular = feed.filter(f => !f.pinned);
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl space-y-6">
+
+      {/* ── BIRTHDAYS INTERNAL WIDGET ── */}
+      {upcomingBirthdays.length > 0 && (
+        <div className="border border-white/[0.06] bg-[#13131c]">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.05]">
+            <Cake size={13} className="text-[#9b2335]/50" strokeWidth={1.5} />
+            <span className="text-white/30 uppercase tracking-widest" style={{ fontSize: "0.55rem" }}>Дни рождения · Закрыто</span>
+            {todayBirthdays.length > 0 && (
+              <span className="ml-auto px-2 py-0.5 font-['Oswald'] uppercase tracking-wider text-[#f59e0b] border border-[#f59e0b]/20 bg-[#f59e0b]/06"
+                style={{ fontSize: "0.5rem" }}>
+                🎂 {todayBirthdays.length} сегодня
+              </span>
+            )}
+          </div>
+          <div className="divide-y divide-white/[0.04]">
+            {upcomingBirthdays.map((p) => {
+              const isToday = isBirthdayToday(p.birthday);
+              const age = getAge(p.birthday);
+              const sign = getZodiacSign(p.birthday);
+              const signEmoji = getZodiacEmoji(sign);
+              return (
+                <div key={p.id} className={`flex items-center gap-3 px-4 py-2.5 ${isToday ? "bg-[#f59e0b]/03" : ""}`}>
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: isToday ? "#f59e0b" : "rgba(155,35,53,0.3)" }} />
+                  <span className="flex-1 font-['Oswald'] tracking-wide truncate"
+                    style={{ fontSize: "0.78rem", color: isToday ? "rgba(245,158,11,0.8)" : "rgba(255,255,255,0.5)" }}>
+                    {p.name}
+                  </span>
+                  <span className="font-['Oswald'] text-white/20 tracking-wide shrink-0" style={{ fontSize: "0.62rem" }}>
+                    {signEmoji} {formatBirthdayRu(p.birthday)}
+                    {age !== null && !isToday && <span className="ml-1.5">· {age + 1} лет</span>}
+                    {isToday && <span className="ml-1.5 text-[#f59e0b]/50">🎉 сегодня!</span>}
+                    {!isToday && <span className="ml-1.5 opacity-50">· {p.days}д</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="px-4 py-2 border-t border-white/[0.04]">
+            <p className="font-['Oswald'] text-white/12 tracking-wide" style={{ fontSize: "0.58rem" }}>
+              🔒 Внутренний раздел — видно только участникам
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div>
 
       {/* ── EMPTY ── */}
       {feed.length === 0 && (
@@ -163,6 +224,7 @@ export function CabinetFeed({ notifications, memberName, avatarUrl }: Props) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

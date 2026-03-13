@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Lock,
@@ -35,44 +36,44 @@ import {
   Home,
   ClipboardList,
   Bell,
-  Send,
-  ToggleLeft,
-  ToggleRight,
   Vote,
-  KeyRound,
-  RefreshCw,
+  Send,
+  Award,
+  UserCircle,
+  Car,
+  Building2,
+  Target,
+  MessageSquare,
+  DollarSign,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useAdminDataWritable, useApplications, addAuditLog, type AuditLogEntry } from "../hooks/useAdminData";
-import {
-  putAdminSnapshot,
-  getAdminSnapshot,
-  loginAdmin,
-  listAdminAccounts,
-  createAdminAccount,
-  updateAdminAccount,
-  deleteAdminAccount,
-  type StaffAccountResponse,
-} from "../api/endpoints";
 import { NavbarEditor } from "../components/admin/NavbarEditor";
 import { PagesEditor } from "../components/admin/PagesEditor";
 import { ApplicationsTab } from "../components/admin/ApplicationsTab";
 import { PollsTab } from "../components/admin/PollsTab";
+import { NewsTab } from "../components/admin/NewsTab";
+import { WebhooksTab } from "../components/admin/WebhooksTab";
+import { MomentsTab } from "../components/admin/MomentsTab";
+import { AccountsTab } from "../components/admin/AccountsTab";
+import { VehiclesAdminTab } from "../components/admin/VehiclesAdminTab";
+import { ContractsAdminTab } from "../components/admin/ContractsAdminTab";
+import { UpgradesAdminTab } from "../components/admin/UpgradesAdminTab";
+import { InfrastructureAdminTab } from "../components/admin/InfrastructureAdminTab";
 import { TelegramBotTab } from "../components/admin/TelegramBotTab";
+import { BirthdaysTab } from "../components/admin/BirthdaysTab";
+import { SystemStatusTab } from "../components/admin/SystemStatusTab";
+import { RoleTemplatesTab } from "../components/admin/RoleTemplatesTab";
+import { FamilyGoalsTab } from "../components/admin/FamilyGoalsTab";
+import { ReportsTab } from "../components/admin/ReportsTab";
+import { NotificationsAdminTab } from "../components/admin/NotificationsAdminTab";
+import { TreasuryTab } from "../components/admin/TreasuryTab";
+import { StatsAdminTab } from "./StatsPage";
 import {
-  getWebhookConfig,
-  saveWebhookConfig,
-  getWebhookEvents,
-  saveWebhookEvents,
-  testWebhook,
   notifyMemberAdded,
   notifyMemberRemoved,
   notifyNewAnnouncement,
   notifyLeadershipChange,
-  DEFAULT_WEBHOOK_CONFIG,
-  DEFAULT_WEBHOOK_EVENTS,
-  type WebhookConfig,
-  type WebhookEvents,
 } from "../hooks/useDiscordWebhook";
 
 /* ═══════════════════════════════════════════════
@@ -90,9 +91,24 @@ type Tab =
   | "navbar"
   | "settings"
   | "polls"
+  | "news"
+  | "moments"
+  | "webhooks"
   | "auditlog"
   | "accounts"
-  | "telegram_bot";
+  | "vehicles"
+  | "contracts_admin"
+  | "upgrades_admin"
+  | "infrastructure_admin"
+  | "telegram_bot"
+  | "birthdays"
+  | "system_status"
+  | "role_templates"
+  | "goals"
+  | "reports"
+  | "notifications"
+  | "treasury"
+  | "stats_admin";
 
 /* Permission-to-tab mapping */
 const tabPermissions: Record<Tab, string | null> = {
@@ -106,15 +122,30 @@ const tabPermissions: Record<Tab, string | null> = {
   pages: "manage_settings",
   navbar: "manage_settings",
   polls: "manage_settings",
+  news: "manage_announcements",
+  moments: "manage_media",
+  webhooks: "manage_settings",
   auditlog: "manage_settings",
-  accounts: "all",
+  accounts: "manage_members",
+  vehicles: "manage_settings",
+  contracts_admin: "manage_members",
+  upgrades_admin: "manage_settings",
+  infrastructure_admin: "manage_settings",
   telegram_bot: "manage_settings",
+  birthdays: "manage_members",
+  system_status: "view_admin",
+  role_templates: "manage_staff",
+  goals: "manage_goals",
+  reports: "manage_reports",
+  notifications: "manage_announcements",
+  treasury: "manage_settings",
+  stats_admin: "view_admin",
 };
 
 interface Member {
   id: string;
   name: string;
-  role: "owner" | "dep_owner" | "veteran" | "member";
+  role: "owner" | "dep_owner" | "close" | "old" | "main" | "academy";
   joinDate: string;
   active: boolean;
   badges?: string[];
@@ -165,27 +196,29 @@ interface StaffMember {
    INITIAL DATA
    ═══════════════════════════════════════════════ */
 
+const ADMIN_PASSWORD = "schwarz2026";
+
 const defaultMembers: Member[] = [
   { id: "1", name: "Madara Schwarz", role: "owner", joinDate: "2024-01-01", active: true, badges: ["streamer", "fib", "leader"] },
   { id: "2", name: "Akihiro Schwarz", role: "dep_owner", joinDate: "2024-02-15", active: true, badges: ["fib", "leader"] },
   { id: "3", name: "Roman Schwarz", role: "dep_owner", joinDate: "2024-03-10", active: true, badges: ["fib", "leader"] },
-  { id: "4", name: "Kerro Schwarz", role: "veteran", joinDate: "2024-04-01", active: true },
-  { id: "5", name: "Turbo Schwarz", role: "veteran", joinDate: "2024-04-15", active: true },
-  { id: "6", name: "Ilia Schwarz", role: "veteran", joinDate: "2024-05-01", active: true },
-  { id: "7", name: "Jay Schwarz", role: "veteran", joinDate: "2024-05-20", active: true },
-  { id: "8", name: "Anti Schwarz", role: "veteran", joinDate: "2024-06-01", active: true },
-  { id: "9", name: "Richie Schwarz", role: "veteran", joinDate: "2024-06-15", active: true },
-  { id: "10", name: "Voldemar Schwarz", role: "veteran", joinDate: "2024-07-01", active: true },
-  { id: "11", name: "Brooklyn Schwarz", role: "member", joinDate: "2024-08-01", active: true },
-  { id: "12", name: "Marka Schwarz", role: "member", joinDate: "2024-08-15", active: true },
-  { id: "13", name: "Krasty Schwarz", role: "member", joinDate: "2024-09-01", active: true },
-  { id: "14", name: "Patrick Schwarz", role: "member", joinDate: "2024-09-15", active: true },
+  { id: "4", name: "Kerro Schwarz", role: "close", joinDate: "2024-04-01", active: true },
+  { id: "5", name: "Turbo Schwarz", role: "old", joinDate: "2024-04-15", active: true },
+  { id: "6", name: "Ilia Schwarz", role: "old", joinDate: "2024-05-01", active: true },
+  { id: "7", name: "Jay Schwarz", role: "main", joinDate: "2024-05-20", active: true },
+  { id: "8", name: "Anti Schwarz", role: "main", joinDate: "2024-06-01", active: true },
+  { id: "9", name: "Richie Schwarz", role: "main", joinDate: "2024-06-15", active: true },
+  { id: "10", name: "Voldemar Schwarz", role: "main", joinDate: "2024-07-01", active: true },
+  { id: "11", name: "Brooklyn Schwarz", role: "academy", joinDate: "2024-08-01", active: true },
+  { id: "12", name: "Marka Schwarz", role: "academy", joinDate: "2024-08-15", active: true },
+  { id: "13", name: "Krasty Schwarz", role: "academy", joinDate: "2024-09-01", active: true },
+  { id: "14", name: "Patrick Schwarz", role: "academy", joinDate: "2024-09-15", active: true },
 ];
 
 const defaultLeaderships: Leadership[] = [
   { id: "1", faction: "LSPD", server: "Harmony", leader: "Madara Schwarz", startDate: "2024-08-15", endDate: "2024-10-01", status: "completed", color: "#3b82f6" },
   { id: "2", faction: "FIB I", server: "Harmony", leader: "Roman Schwarz", startDate: "2024-12-18", endDate: "2025-01-18", status: "completed", color: "#1e40af" },
-  { id: "3", faction: "LSSD", server: "Harmony", leader: "Borsch Schwarz", startDate: "2025-03-01", endDate: "2025-05-15", status: "completed", color: "#92400e" },
+  { id: "3", faction: "LSSD", server: "Harmony", leader: "Akihiro Schwarz", startDate: "2025-03-01", endDate: "2025-05-15", status: "completed", color: "#92400e" },
   { id: "4", faction: "Yakuza", server: "Harmony", leader: "Madara Schwarz", startDate: "2025-07-01", endDate: "2025-09-30", status: "completed", color: "#dc2626" },
   { id: "5", faction: "FIB II", server: "Harmony", leader: "Akihiro Schwarz", startDate: "2025-10-27", endDate: "2026-01-12", status: "completed", color: "#1e3a5f" },
   { id: "6", faction: "FIB", server: "Seattle", leader: "TBD", startDate: "2026-02-01", endDate: "", status: "active", color: "#f59e0b" },
@@ -210,7 +243,7 @@ const defaultPrinciples: Principle[] = [
   { id: "3", text: "Рассудительно относиться к любым РП-ситуациям" },
   { id: "4", text: "Помогать и поддерживать друг друга" },
   { id: "5", text: "Уважать каждого — без исключений" },
-  { id: "6", text: "Не опускаться до уровня животных, даже если животное напротив тебя" },
+  { id: "6", text: "Не о��ускаться до уровня животных, даже если животное напротив тебя" },
 ];
 
 const allPermissions = [
@@ -222,6 +255,10 @@ const allPermissions = [
   "manage_media",
   "manage_staff",
   "view_admin",
+  "approve_moments",
+  "manage_goals",
+  "manage_reports",
+  "manage_birthdays",
 ] as const;
 
 const permissionLabels: Record<string, string> = {
@@ -233,6 +270,10 @@ const permissionLabels: Record<string, string> = {
   manage_media: "Управление медиа",
   manage_staff: "Управление стаффом",
   view_admin: "Доступ к админке",
+  approve_moments: "Одобрение моментов",
+  manage_goals: "Цели семьи",
+  manage_reports: "Жалобы",
+  manage_birthdays: "Дни рождения",
 };
 
 const defaultStaff: StaffMember[] = [
@@ -261,22 +302,26 @@ function saveState<T>(key: string, data: T) {
 
 const roleLabels: Record<Member["role"], string> = {
   owner: "Owner",
-  dep_owner: "Dep. Owner",
-  veteran: "Ветеран",
-  member: "Участник",
+  dep_owner: "Dep.Owner",
+  close: "Close",
+  old: "Old",
+  main: "Main",
+  academy: "Academy",
 };
 
 const roleColors: Record<Member["role"], string> = {
   owner: "#9b2335",
   dep_owner: "#7a1c2a",
-  veteran: "#f59e0b",
-  member: "#888899",
+  close: "#c43e54",
+  old: "#b8860b",
+  main: "#ff3366",
+  academy: "#888899",
 };
 
 /* Badge definitions */
 const AVAILABLE_BADGES: { id: string; label: string; color: string; category: string }[] = [
   // Работы
-  { id: "fisherman", label: "Рыбак", color: "#3b82f6", category: "Работы" },
+  { id: "fisherman", label: "Рыбак", color: "#3b82f6", category: "Р��боты" },
   { id: "miner", label: "Шахтёр", color: "#a855f7", category: "Работы" },
   { id: "trucker", label: "Дальнобойщик", color: "#f97316", category: "Работы" },
   { id: "farmer", label: "Фермер", color: "#22c55e", category: "Работы" },
@@ -301,8 +346,10 @@ const badgeMap = Object.fromEntries(AVAILABLE_BADGES.map((b) => [b.id, b]));
 const roleIcons: Record<Member["role"], typeof Crown> = {
   owner: Crown,
   dep_owner: Shield,
-  veteran: Star,
-  member: User,
+  close: Shield,
+  old: Award,
+  main: Star,
+  academy: User,
 };
 
 const priorityColors: Record<Announcement["priority"], string> = {
@@ -331,39 +378,28 @@ function generateId() {
    LOGIN SCREEN
    ═══════════════════════════════════════════════ */
 
-function LoginScreen({
-  onLogin,
-}: {
-  onLogin: (account: StaffAccountResponse) => void;
-}) {
-  const [username, setUsername] = useState("");
+function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [error, setError] = useState(false);
   const [shake, setShake] = useState(false);
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password) return;
-    setLoading(true);
-    setErrorMsg("");
-
-    const result = await loginAdmin(username.trim(), password);
-    if (result?.ok && result.account) {
-      onLogin(result.account);
+    if (password === ADMIN_PASSWORD) {
+      sessionStorage.setItem("schwarz_admin_auth", "1");
+      onLogin();
     } else {
-      const msg = result === null ? "Сервер недоступен. Запустите npm run api" : "Неверный логин или пароль";
-      setErrorMsg(msg);
+      setError(true);
       setShake(true);
       setTimeout(() => setShake(false), 600);
+      setTimeout(() => setError(false), 3000);
     }
-
-    setLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center px-4">
+      {/* Background effects */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#9b2335]/3 blur-[200px] rounded-full pointer-events-none" />
 
       <motion.div
@@ -372,6 +408,7 @@ function LoginScreen({
         transition={{ duration: 0.6 }}
         className="w-full max-w-sm relative"
       >
+        {/* Logo */}
         <div className="text-center mb-10">
           <h1
             className="font-['Russo_One'] text-[#9b2335]"
@@ -387,6 +424,7 @@ function LoginScreen({
           </p>
         </div>
 
+        {/* Login card */}
         <motion.div
           animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
           transition={{ duration: 0.4 }}
@@ -401,31 +439,21 @@ function LoginScreen({
                 Авторизация
               </p>
               <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.7rem" }}>
-                Введите логин и пароль
+                Введите пароль администратора
               </p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Логин"
-              autoFocus
-              autoComplete="username"
-              className="w-full bg-[#0d0d15] border border-white/8 focus:border-[#9b2335]/30 text-white/80 font-['Oswald'] tracking-wide px-4 py-3 outline-none transition-colors duration-300"
-              style={{ fontSize: "0.85rem" }}
-            />
-            <div className="relative">
+          <form onSubmit={handleSubmit}>
+            <div className="relative mb-6">
               <input
                 type={showPass ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Пароль"
-                autoComplete="current-password"
                 className="w-full bg-[#0d0d15] border border-white/8 focus:border-[#9b2335]/30 text-white/80 font-['Oswald'] tracking-wide px-4 py-3 pr-12 outline-none transition-colors duration-300"
                 style={{ fontSize: "0.85rem" }}
+                autoFocus
               />
               <button
                 type="button"
@@ -437,26 +465,25 @@ function LoginScreen({
             </div>
 
             <AnimatePresence>
-              {errorMsg && (
+              {error && (
                 <motion.p
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="font-['Oswald'] text-[#ff3366]/60 tracking-wide"
-                  style={{ fontSize: "0.72rem" }}
+                  className="font-['Oswald'] text-[#ff3366]/60 tracking-wide mb-4"
+                  style={{ fontSize: "0.75rem" }}
                 >
-                  {errorMsg}
+                  Неверный пароль
                 </motion.p>
               )}
             </AnimatePresence>
 
             <button
               type="submit"
-              disabled={loading || !username.trim() || !password}
-              className="w-full font-['Oswald'] uppercase tracking-[0.2em] text-white bg-[#9b2335] hover:bg-[#b52a40] py-3 transition-all duration-300 hover:shadow-[0_0_30px_rgba(155,35,53,0.2)] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full font-['Oswald'] uppercase tracking-[0.2em] text-white bg-[#9b2335] hover:bg-[#b52a40] py-3 transition-all duration-300 hover:shadow-[0_0_30px_rgba(155,35,53,0.2)]"
               style={{ fontSize: "0.8rem" }}
             >
-              {loading ? "Проверка..." : "Войти"}
+              Войти
             </button>
           </form>
         </motion.div>
@@ -473,20 +500,35 @@ function LoginScreen({
    SIDEBAR
    ═══════════════════════════════════════════════ */
 
-const sidebarItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
+const sidebarItems: { id: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
   { id: "dashboard", label: "Дашборд", icon: LayoutDashboard },
   { id: "members", label: "Состав", icon: Users },
   { id: "leaderships", label: "Лидерки", icon: Crown },
   { id: "announcements", label: "Объявления", icon: Megaphone },
   { id: "applications", label: "Заявки", icon: UserPlus },
+  { id: "news", label: "Schwarz News", icon: Bell },
+  { id: "moments", label: "Моменты", icon: ImageIcon },
+  { id: "notifications", label: "Уведомления", icon: Bell },
   { id: "rules", label: "Правила & Стафф", icon: FileText },
   { id: "pages", label: "Страницы", icon: Globe },
   { id: "navbar", label: "Навигация", icon: PanelTop },
   { id: "polls", label: "Голосования", icon: Vote },
+  { id: "webhooks", label: "Вебхуки", icon: Send },
   { id: "auditlog", label: "Аудит-лог", icon: ClipboardList },
   { id: "settings", label: "Настройки", icon: Settings },
-  { id: "accounts", label: "Аккаунты", icon: KeyRound },
+  { id: "accounts", label: "Аккаунты ЛК", icon: UserCircle },
+  { id: "vehicles", label: "Транспорт", icon: Car },
+  { id: "contracts_admin", label: "Контракты", icon: Award },
+  { id: "upgrades_admin", label: "Улучшения", icon: TrendingUp },
+  { id: "infrastructure_admin", label: "Инфраструктура", icon: Building2 },
   { id: "telegram_bot", label: "Telegram Bot", icon: Send },
+  { id: "birthdays", label: "Дни рождения", icon: Calendar },
+  { id: "system_status", label: "Статус системы", icon: Activity },
+  { id: "role_templates", label: "Шаблоны ролей", icon: Shield },
+  { id: "goals", label: "Цели семьи", icon: Target },
+  { id: "reports", label: "Жалобы", icon: AlertTriangle, badge: (() => { try { const r = localStorage.getItem("schwarz_reports"); const rep = r ? JSON.parse(r) : []; return rep.filter((x: { status: string }) => x.status === "open").length || undefined; } catch { return undefined; } })() },
+  { id: "treasury", label: "Казна", icon: DollarSign },
+  { id: "stats_admin", label: "Статистика", icon: TrendingUp },
 ];
 
 function Sidebar({
@@ -556,6 +598,14 @@ function Sidebar({
                   {pendingApps}
                 </span>
               )}
+              {!blocked && !!item.badge && item.badge > 0 && item.id !== "applications" && (
+                <span
+                  className="shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#f59e0b] text-white font-['Oswald']"
+                  style={{ fontSize: "0.55rem", padding: "0 4px" }}
+                >
+                  {item.badge}
+                </span>
+              )}
             </button>
           );
         })}
@@ -583,7 +633,7 @@ function Sidebar({
           <LogOut size={16} strokeWidth={1.5} className="shrink-0" />
           {!collapsed && (
             <span className="font-['Oswald'] uppercase tracking-wider" style={{ fontSize: "0.68rem" }}>
-              Выйти
+              Вы��ти
             </span>
           )}
         </button>
@@ -611,11 +661,68 @@ function DashboardTab({
   const activeLeaderships = leaderships.filter((l) => l.status === "active").length;
   const completedLeaderships = leaderships.filter((l) => l.status === "completed").length;
 
+  // Load extra stats from localStorage
+  const contractsStats = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("schwarz_contracts");
+      if (!raw) return { open: 0, in_progress: 0, completed: 0, failed: 0 };
+      const c = JSON.parse(raw) as { status: string }[];
+      return {
+        open: c.filter((x) => x.status === "open").length,
+        in_progress: c.filter((x) => x.status === "in_progress").length,
+        completed: c.filter((x) => x.status === "completed").length,
+        failed: c.filter((x) => x.status === "failed").length,
+      };
+    } catch { return { open: 0, in_progress: 0, completed: 0, failed: 0 }; }
+  }, []);
+
+  const goalsStats = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("schwarz_family_goals");
+      if (!raw) return { active: 0, completed: 0, planned: 0 };
+      const g = JSON.parse(raw) as { status: string }[];
+      return {
+        active: g.filter((x) => x.status === "active").length,
+        completed: g.filter((x) => x.status === "completed").length,
+        planned: g.filter((x) => x.status === "planned").length,
+      };
+    } catch { return { active: 0, completed: 0, planned: 0 }; }
+  }, []);
+
+  const reportsOpen = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("schwarz_reports");
+      if (!raw) return 0;
+      return (JSON.parse(raw) as { status: string }[]).filter((r) => r.status === "open").length;
+    } catch { return 0; }
+  }, []);
+
   const stats = [
     { label: "Участников", value: activeMembers, icon: Users, color: "#9b2335" },
     { label: "Активных лидерок", value: activeLeaderships, icon: Crown, color: "#f59e0b" },
     { label: "Заявок ожидает", value: pendingApps, icon: UserPlus, color: "#ff3366" },
     { label: "Объявлений", value: announcements.length, icon: Megaphone, color: "#9146ff" },
+    { label: "Контрактов завершено", value: contractsStats.completed, icon: CheckCircle2, color: "#22c55e" },
+    { label: "Открытых жалоб", value: reportsOpen, icon: AlertTriangle, color: reportsOpen > 0 ? "#f59e0b" : "#6b7280" },
+    { label: "Целей в работе", value: goalsStats.active, icon: Star, color: "#38bdf8" },
+    { label: "Лидерок всего", value: completedLeaderships + activeLeaderships, icon: TrendingUp, color: "#c43e54" },
+  ];
+
+  /* Pie chart data: members by role */
+  const pieData = (["owner", "dep_owner", "close", "old", "main", "academy"] as Member["role"][])
+    .map((role) => ({
+      name: roleLabels[role],
+      value: members.filter((m) => m.role === role && m.active).length,
+      color: roleColors[role],
+    }))
+    .filter((d) => d.value > 0);
+
+  /* Bar chart: contracts */
+  const contractBarData = [
+    { name: "Открыт", value: contractsStats.open, color: "#38bdf8" },
+    { name: "В работе", value: contractsStats.in_progress, color: "#f59e0b" },
+    { name: "Завершён", value: contractsStats.completed, color: "#22c55e" },
+    { name: "Провал", value: contractsStats.failed, color: "#ef4444" },
   ];
 
   return (
@@ -625,132 +732,178 @@ function DashboardTab({
       </h2>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         {stats.map((s, i) => (
           <motion.div
             key={s.label}
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08, duration: 0.4 }}
-            className="border border-white/5 bg-white/[0.01] p-5"
+            transition={{ delay: i * 0.05, duration: 0.4 }}
+            className="border border-white/5 bg-white/[0.01] p-4"
           >
-            <div className="flex items-center justify-between mb-3">
-              <s.icon size={18} style={{ color: s.color, opacity: 0.5 }} strokeWidth={1.5} />
+            <div className="flex items-center justify-between mb-2">
+              <s.icon size={15} style={{ color: s.color, opacity: 0.45 }} strokeWidth={1.5} />
               <span
                 className="font-['Russo_One']"
-                style={{ fontSize: "1.8rem", color: s.color, filter: `drop-shadow(0 0 10px ${s.color}33)` }}
+                style={{ fontSize: "1.5rem", color: s.color, filter: `drop-shadow(0 0 8px ${s.color}40)` }}
               >
                 {s.value}
               </span>
             </div>
-            <p className="font-['Oswald'] text-white/25 uppercase tracking-wider" style={{ fontSize: "0.65rem" }}>
+            <p className="font-['Oswald'] text-white/22 uppercase tracking-wider" style={{ fontSize: "0.58rem" }}>
               {s.label}
             </p>
           </motion.div>
         ))}
       </div>
 
-      {/* Recent activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Members by role */}
+      {/* Charts row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Pie: Members by role */}
         <div className="border border-white/5 bg-white/[0.01] p-6">
-          <h3 className="font-['Oswald'] text-white/60 uppercase tracking-wider mb-5" style={{ fontSize: "0.75rem" }}>
+          <h3 className="font-['Oswald'] text-white/50 uppercase tracking-wider mb-5" style={{ fontSize: "0.72rem" }}>
             Состав по рангам
           </h3>
-          {(["owner", "dep_owner", "veteran", "member"] as Member["role"][]).map((role) => {
-            const count = members.filter((m) => m.role === role && m.active).length;
-            const total = activeMembers;
-            const pct = total > 0 ? (count / total) * 100 : 0;
-            return (
-              <div key={role} className="mb-4 last:mb-0">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-['Oswald'] text-white/40 tracking-wide" style={{ fontSize: "0.75rem" }}>
-                    {roleLabels[role]}
-                  </span>
-                  <span className="font-['Oswald'] text-white/25" style={{ fontSize: "0.7rem" }}>
-                    {count}
-                  </span>
-                </div>
-                <div className="h-1.5 bg-white/5 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{ delay: 0.3, duration: 0.8 }}
-                    className="h-full"
-                    style={{ background: roleColors[role] }}
-                  />
-                </div>
+          {activeMembers === 0 ? (
+            <p className="font-['Oswald'] text-white/15 tracking-wide text-center py-8" style={{ fontSize: "0.78rem" }}>
+              Нет участников
+            </p>
+          ) : (
+            <div className="flex items-center gap-6">
+              <div style={{ width: 140, height: 140 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={65}
+                      dataKey="value" stroke="none">
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ background: "#0d0d15", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 0, fontFamily: "Oswald" }}
+                      labelStyle={{ color: "rgba(255,255,255,0.5)", fontSize: "0.7rem" }}
+                      itemStyle={{ color: "rgba(255,255,255,0.7)", fontSize: "0.7rem" }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            );
-          })}
-        </div>
-
-        {/* Recent announcements */}
-        <div className="border border-white/5 bg-white/[0.01] p-6">
-          <h3 className="font-['Oswald'] text-white/60 uppercase tracking-wider mb-5" style={{ fontSize: "0.75rem" }}>
-            Последние объявления
-          </h3>
-          {announcements.slice(0, 4).map((a) => (
-            <div key={a.id} className="flex items-start gap-3 mb-4 last:mb-0">
-              <div
-                className="w-2 h-2 rounded-full mt-1.5 shrink-0"
-                style={{ background: priorityColors[a.priority] }}
-              />
-              <div>
-                <p className="font-['Oswald'] text-white/50 tracking-wide" style={{ fontSize: "0.78rem" }}>
-                  {a.title}
-                </p>
-                <p className="font-['Oswald'] text-white/15 tracking-wide mt-0.5" style={{ fontSize: "0.65rem" }}>
-                  {a.date}
-                </p>
+              <div className="flex-1 space-y-2">
+                {pieData.map((d) => (
+                  <div key={d.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
+                      <span className="font-['Oswald'] text-white/35 tracking-wide" style={{ fontSize: "0.68rem" }}>{d.name}</span>
+                    </div>
+                    <span className="font-['Russo_One']" style={{ fontSize: "0.85rem", color: d.color }}>{d.value}</span>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
+          )}
+        </div>
+
+        {/* Bar: Contracts */}
+        <div className="border border-white/5 bg-white/[0.01] p-6">
+          <h3 className="font-['Oswald'] text-white/50 uppercase tracking-wider mb-5" style={{ fontSize: "0.72rem" }}>
+            Статистика контрактов
+          </h3>
+          <div style={{ height: 140 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={contractBarData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" />
+                <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 9, fontFamily: "Oswald" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "rgba(255,255,255,0.15)", fontSize: 9, fontFamily: "Oswald" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ background: "#0d0d15", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 0, fontFamily: "Oswald" }}
+                  labelStyle={{ color: "rgba(255,255,255,0.5)", fontSize: "0.7rem" }}
+                  itemStyle={{ color: "rgba(255,255,255,0.7)", fontSize: "0.7rem" }}
+                  cursor={{ fill: "rgba(255,255,255,0.03)" }}
+                />
+                <Bar dataKey="value" radius={[1, 1, 0, 0]}>
+                  {contractBarData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.7} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
-      {/* Active leaderships */}
-      <div className="mt-6 border border-white/5 bg-white/[0.01] p-6">
-        <h3 className="font-['Oswald'] text-white/60 uppercase tracking-wider mb-5" style={{ fontSize: "0.75rem" }}>
-          Активные лидерки
-        </h3>
-        {leaderships.filter((l) => l.status === "active").length === 0 ? (
-          <p className="font-['Oswald'] text-white/15 tracking-wide" style={{ fontSize: "0.75rem" }}>
-            Нет активных лидерок
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {leaderships
-              .filter((l) => l.status === "active")
-              .map((l) => (
-                <div key={l.id} className="flex items-center gap-4 p-3 border border-white/5 bg-white/[0.01]">
-                  <div className="w-3 h-3 rounded-full" style={{ background: l.color }} />
-                  <div className="flex-1">
-                    <span className="font-['Oswald'] text-white/60 tracking-wide" style={{ fontSize: "0.82rem" }}>
-                      {l.faction}
-                    </span>
-                    <span className="font-['Oswald'] text-white/20 tracking-wide ml-3" style={{ fontSize: "0.7rem" }}>
-                      {l.server}
+      {/* Bottom row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent announcements */}
+        <div className="border border-white/5 bg-white/[0.01] p-6">
+          <h3 className="font-['Oswald'] text-white/50 uppercase tracking-wider mb-5" style={{ fontSize: "0.72rem" }}>
+            Последние объявления
+          </h3>
+          {announcements.length === 0 ? (
+            <p className="font-['Oswald'] text-white/12 tracking-wide" style={{ fontSize: "0.75rem" }}>Нет объявлений</p>
+          ) : (
+            announcements.slice(0, 4).map((a) => (
+              <div key={a.id} className="flex items-start gap-3 mb-4 last:mb-0">
+                <div
+                  className="w-2 h-2 rounded-full mt-1.5 shrink-0"
+                  style={{ background: priorityColors[a.priority] }}
+                />
+                <div>
+                  <p className="font-['Oswald'] text-white/50 tracking-wide" style={{ fontSize: "0.78rem" }}>
+                    {a.title}
+                  </p>
+                  <p className="font-['Oswald'] text-white/15 tracking-wide mt-0.5" style={{ fontSize: "0.65rem" }}>
+                    {a.date}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Leaderships */}
+        <div className="border border-white/5 bg-white/[0.01] p-6">
+          <h3 className="font-['Oswald'] text-white/50 uppercase tracking-wider mb-5" style={{ fontSize: "0.72rem" }}>
+            Лидерки
+          </h3>
+          {/* Summary pills */}
+          <div className="flex items-center gap-2 mb-5 flex-wrap">
+            {[
+              { label: "Всего", value: leaderships.length, color: "#6b7280" },
+              { label: "Активных", value: activeLeaderships, color: "#9b2335" },
+              { label: "Завершено", value: completedLeaderships, color: "#22c55e" },
+            ].map((s) => (
+              <div key={s.label} className="flex items-center gap-1.5 px-3 py-1.5 border border-white/[0.05]">
+                <span className="font-['Russo_One']" style={{ fontSize: "1rem", color: s.color }}>{s.value}</span>
+                <span className="font-['Oswald'] text-white/20 uppercase tracking-wider" style={{ fontSize: "0.55rem" }}>{s.label}</span>
+              </div>
+            ))}
+          </div>
+          {leaderships.filter((l) => l.status === "active").length === 0 ? (
+            <p className="font-['Oswald'] text-white/15 tracking-wide" style={{ fontSize: "0.75rem" }}>
+              Нет активных лидерок
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {leaderships
+                .filter((l) => l.status === "active")
+                .map((l) => (
+                  <div key={l.id} className="flex items-center gap-3 p-3 border border-white/5 bg-white/[0.01]">
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ background: l.color }} />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-['Oswald'] text-white/60 tracking-wide" style={{ fontSize: "0.82rem" }}>
+                        {l.faction}
+                      </span>
+                      <span className="font-['Oswald'] text-white/20 tracking-wide ml-3" style={{ fontSize: "0.7rem" }}>
+                        {l.server}
+                      </span>
+                    </div>
+                    <span className="font-['Oswald'] text-white/30 tracking-wide shrink-0" style={{ fontSize: "0.72rem" }}>
+                      {l.leader}
                     </span>
                   </div>
-                  <span className="font-['Oswald'] text-white/30 tracking-wide" style={{ fontSize: "0.72rem" }}>
-                    {l.leader}
-                  </span>
-                  <span
-                    className="px-2 py-0.5 font-['Oswald'] uppercase tracking-wider border"
-                    style={{
-                      fontSize: "0.55rem",
-                      color: statusColors[l.status],
-                      borderColor: `${statusColors[l.status]}30`,
-                      background: `${statusColors[l.status]}08`,
-                    }}
-                  >
-                    {statusLabels[l.status]}
-                  </span>
-                </div>
-              ))}
-          </div>
-        )}
+                ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -809,10 +962,10 @@ function MembersTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newRole, setNewRole] = useState<Member["role"]>("member");
+  const [newRole, setNewRole] = useState<Member["role"]>("academy");
   const [newBadges, setNewBadges] = useState<string[]>([]);
   const [editName, setEditName] = useState("");
-  const [editRole, setEditRole] = useState<Member["role"]>("member");
+  const [editRole, setEditRole] = useState<Member["role"]>("academy");
   const [editBadges, setEditBadges] = useState<string[]>([]);
   const [filter, setFilter] = useState<Member["role"] | "all">("all");
   const [badgePickerFor, setBadgePickerFor] = useState<"add" | "edit" | null>(null);
@@ -836,7 +989,7 @@ function MembersTab({
     addAuditLog("Добавлен участник", "members", `${newName.trim()} (${newRole})`);
     notifyMemberAdded(newName.trim(), newRole);
     setNewName("");
-    setNewRole("member");
+    setNewRole("academy");
     setNewBadges([]);
     setShowAdd(false);
   };
@@ -892,7 +1045,7 @@ function MembersTab({
 
       {/* Filter */}
       <div className="flex items-center gap-2 mb-6 flex-wrap">
-        {(["all", "owner", "dep_owner", "veteran", "member"] as const).map((r) => (
+        {(["all", "owner", "dep_owner", "close", "old", "main", "academy"] as const).map((r) => (
           <button
             key={r}
             onClick={() => setFilter(r)}
@@ -941,10 +1094,12 @@ function MembersTab({
                     className="w-full bg-[#0d0d15] border border-white/8 text-white/80 font-['Oswald'] tracking-wide px-3 py-2 outline-none"
                     style={{ fontSize: "0.82rem" }}
                   >
-                    <option value="member">Участник</option>
-                    <option value="veteran">Ветеран</option>
-                    <option value="dep_owner">Dep. Owner</option>
                     <option value="owner">Owner</option>
+                    <option value="dep_owner">Dep.Owner</option>
+                    <option value="close">Close</option>
+                    <option value="old">Old</option>
+                    <option value="main">Main</option>
+                    <option value="academy">Academy</option>
                   </select>
                 </div>
                 <div className="flex gap-2">
@@ -1046,10 +1201,12 @@ function MembersTab({
                       className="bg-[#0d0d15] border border-white/10 text-white/80 font-['Oswald'] tracking-wide px-2 py-1.5 outline-none"
                       style={{ fontSize: "0.75rem" }}
                     >
-                      <option value="member">Участник</option>
-                      <option value="veteran">Ветеран</option>
-                      <option value="dep_owner">Dep. Owner</option>
                       <option value="owner">Owner</option>
+                      <option value="dep_owner">Dep.Owner</option>
+                      <option value="close">Close</option>
+                      <option value="old">Old</option>
+                      <option value="main">Main</option>
+                      <option value="academy">Academy</option>
                     </select>
                     <button onClick={() => handleSaveEdit(m.id)} className="text-[#9b2335]/60 hover:text-[#9b2335] transition-colors">
                       <Save size={16} />
@@ -2203,6 +2360,8 @@ function AuditLogTab() {
     { id: "nav", label: "Навигация", color: "#06b6d4" },
     { id: "pages", label: "Страницы", color: "#ec4899" },
     { id: "applications", label: "Заявки", color: "#22c55e" },
+    { id: "news", label: "Новости", color: "#ec4899" },
+    { id: "media", label: "Медиа", color: "#9b2335" },
   ];
 
   const filtered = filterCategory === "all" ? logs : logs.filter((l) => l.category === filterCategory);
@@ -2338,25 +2497,12 @@ function SettingsTab() {
   const [twitchLink, setTwitchLink] = useState(() => loadState("twitchLink", "https://twitch.tv/nebesnyin"));
   const [saved, setSaved] = useState(false);
 
-  // Webhook state
-  const [whConfig, setWhConfig] = useState<WebhookConfig>(DEFAULT_WEBHOOK_CONFIG);
-  const [whEvents, setWhEvents] = useState<WebhookEvents>(DEFAULT_WEBHOOK_EVENTS);
-  const [testingWh, setTestingWh] = useState(false);
-  const [testResult, setTestResult] = useState<null | boolean>(null);
-
-  useEffect(() => {
-    getWebhookConfig().then(setWhConfig).catch(() => {});
-    getWebhookEvents().then(setWhEvents).catch(() => {});
-  }, []);
-
-  const handleSave = async () => {
+  const handleSave = () => {
     saveState("promoCode", promoCode);
     saveState("promoReward", promoReward);
     saveState("discordLink", discordLink);
     saveState("twitchLink", twitchLink);
-    await saveWebhookConfig(whConfig);
-    await saveWebhookEvents(whEvents);
-    addAuditLog("Настройки обновлены", "settings", "Промокод, ссылки, вебхуки");
+    addAuditLog("Настройки обновлены", "settings", "Промокод, ссылки");
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -2440,119 +2586,14 @@ function SettingsTab() {
           </div>
         </div>
 
-        {/* Discord Webhook */}
-        <div className="border border-white/5 bg-white/[0.01] p-6">
-          <div className="flex items-center gap-3 mb-5">
-            <Bell size={14} className="text-[#5865F2]/50" />
-            <h3 className="font-['Oswald'] text-white/50 uppercase tracking-wider" style={{ fontSize: "0.75rem" }}>
-              Discord Вебх��к
-            </h3>
-            <button
-              onClick={() => setWhConfig({ ...whConfig, enabled: !whConfig.enabled })}
-              className="ml-auto flex items-center gap-2 transition-colors"
-            >
-              {whConfig.enabled ? (
-                <ToggleRight size={22} className="text-[#9b2335]/60" />
-              ) : (
-                <ToggleLeft size={22} className="text-white/15" />
-              )}
-              <span
-                className="font-['Oswald'] uppercase tracking-wider"
-                style={{ fontSize: "0.55rem", color: whConfig.enabled ? "rgba(155,35,53,0.6)" : "rgba(255,255,255,0.15)" }}
-              >
-                {whConfig.enabled ? "Вкл" : "Выкл"}
-              </span>
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="font-['Oswald'] text-white/25 uppercase tracking-wider block mb-2" style={{ fontSize: "0.6rem" }}>
-                Webhook URL
-              </label>
-              <div className="flex gap-2">
-                <input
-                  value={whConfig.url}
-                  onChange={(e) => setWhConfig({ ...whConfig, url: e.target.value })}
-                  placeholder="https://discord.com/api/webhooks/..."
-                  className="flex-1 bg-[#0d0d15] border border-white/8 focus:border-[#5865F2]/30 text-white/60 font-mono tracking-wide px-3 py-2 outline-none transition-colors"
-                  style={{ fontSize: "0.78rem" }}
-                />
-                <button
-                  onClick={async () => {
-                    if (!whConfig.url.trim()) return;
-                    setTestingWh(true);
-                    setTestResult(null);
-                    const ok = await testWebhook(whConfig.url);
-                    setTestResult(ok);
-                    setTestingWh(false);
-                    setTimeout(() => setTestResult(null), 4000);
-                  }}
-                  disabled={testingWh || !whConfig.url.trim()}
-                  className="px-3 py-2 font-['Oswald'] uppercase tracking-wider text-[#5865F2]/60 border border-[#5865F2]/15 hover:border-[#5865F2]/30 hover:bg-[#5865F2]/5 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
-                  style={{ fontSize: "0.6rem" }}
-                >
-                  <Send size={11} />
-                  {testingWh ? "..." : "Тест"}
-                </button>
-              </div>
-              {testResult !== null && (
-                <p
-                  className="font-['Oswald'] tracking-wide mt-2"
-                  style={{ fontSize: "0.7rem", color: testResult ? "#9b2335" : "#ff3366" }}
-                >
-                  {testResult ? "Тестовое сообщение отправлено!" : "Ошибка отправки. Проверь URL."}
-                </p>
-              )}
-            </div>
-
-            {/* Events toggles */}
-            <div>
-              <label className="font-['Oswald'] text-white/25 uppercase tracking-wider block mb-3" style={{ fontSize: "0.6rem" }}>
-                Уведомления о событиях
-              </label>
-              <div className="space-y-2">
-                {([
-                  { key: "newApplication" as const, label: "Новая заявка", color: "#f59e0b" },
-                  { key: "applicationVerdict" as const, label: "Решение по заявке", color: "#9b2335" },
-                  { key: "memberAdded" as const, label: "Добавлен участник", color: "#9b2335" },
-                  { key: "memberRemoved" as const, label: "Удалён участник", color: "#ff3366" },
-                  { key: "newAnnouncement" as const, label: "Новое объявление", color: "#5865F2" },
-                  { key: "leadershipChange" as const, label: "��зменения лидерок", color: "#f59e0b" },
-                ]).map((evt) => (
-                  <button
-                    key={evt.key}
-                    onClick={() => setWhEvents({ ...whEvents, [evt.key]: !whEvents[evt.key] })}
-                    className="w-full flex items-center justify-between px-3 py-2 border border-white/5 hover:border-white/10 transition-all group"
-                  >
-                    <span
-                      className="font-['Oswald'] tracking-wide"
-                      style={{
-                        fontSize: "0.75rem",
-                        color: whEvents[evt.key] ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.15)",
-                      }}
-                    >
-                      {evt.label}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-1.5 h-1.5 rounded-full transition-all"
-                        style={{
-                          background: whEvents[evt.key] ? evt.color : "rgba(255,255,255,0.08)",
-                          boxShadow: whEvents[evt.key] ? `0 0 6px ${evt.color}40` : "none",
-                        }}
-                      />
-                      {whEvents[evt.key] ? (
-                        <ToggleRight size={16} style={{ color: evt.color, opacity: 0.6 }} />
-                      ) : (
-                        <ToggleLeft size={16} className="text-white/10" />
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+        {/* Webhook info note */}
+        <div className="border border-[#5865F2]/10 bg-[#5865F2]/[0.02] p-4 flex items-start gap-3">
+          <Bell size={14} className="text-[#5865F2]/30 shrink-0 mt-0.5" />
+          <p className="font-['Oswald'] text-white/25 tracking-wide" style={{ fontSize: "0.7rem", lineHeight: 1.7 }}>
+            Настройка Discord вебхуков перенесена в отдельный раздел{" "}
+            <span className="text-[#5865F2]/40">«Вебхуки»</span>{" "}
+            в боковом меню.
+          </p>
         </div>
 
         {/* Actions */}
@@ -2579,7 +2620,7 @@ function SettingsTab() {
         <div className="border border-white/5 bg-white/[0.01] p-5 flex items-start gap-3">
           <AlertTriangle size={16} className="text-[#f59e0b]/30 shrink-0 mt-0.5" />
           <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.72rem", lineHeight: 1.8 }}>
-            Данные сохраняются на backend сервере и кэшируются через localStorage в браузере.
+            Все данные хранятся локально в браузере (localStorage). При очистке кеша или смене браузера данные будут утеряны. Для полноценной работы рекомендуется подключить базу данных.
           </p>
         </div>
       </div>
@@ -2588,328 +2629,72 @@ function SettingsTab() {
 }
 
 /* ═══════════════════════════════════════════════
-   ACCOUNTS TAB — управление аккаунтами админов
+   STAFF SELECTOR
    ═══════════════════════════════════════════════ */
 
-/* ═══════════════════════════════════════════════
-   ACCOUNTS TAB — управление аккаунтами админов
-   ═══════════════════════════════════════════════ */
-
-const ALL_PERMISSIONS = [
-  { id: "view_admin", label: "Доступ к панели" },
-  { id: "manage_members", label: "Состав" },
-  { id: "manage_leaderships", label: "Лидерки" },
-  { id: "manage_announcements", label: "Объявления" },
-  { id: "manage_rules", label: "Правила" },
-  { id: "manage_settings", label: "Настройки/Страницы" },
-  { id: "all", label: "Все права (root)" },
-] as const;
-
-function AccountsTab({ currentAccountId }: { currentAccountId: string }) {
-  const [accounts, setAccounts] = useState<StaffAccountResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-
-  // Create form
-  const [cUsername, setCUsername] = useState("");
-  const [cPassword, setCPassword] = useState("");
-  const [showCPass, setShowCPass] = useState(true); // visible by default so admin can copy
-  const [cDisplay, setCDisplay] = useState("");
-  const [cPosition, setCPosition] = useState("");
-  const [cPerms, setCPerms] = useState<string[]>(["view_admin"]);
-  const [cError, setCError] = useState("");
-  const [cSaving, setCsaving] = useState(false);
-
-  // Edit form
-  const [eDisplay, setEDisplay] = useState("");
-  const [ePosition, setEPosition] = useState("");
-  const [ePerms, setEPerms] = useState<string[]>([]);
-  const [ePassword, setEPassword] = useState("");
-  const [showEPass, setShowEPass] = useState(false);
-  const [eSaving, setESaving] = useState(false);
-
-  const refresh = async () => {
-    setLoading(true);
-    const data = await listAdminAccounts();
-    if (data) setAccounts(data);
-    setLoading(false);
-  };
-
-  useEffect(() => { void refresh(); }, []);
-
-  const startEdit = (acc: StaffAccountResponse) => {
-    setEditId(acc.id);
-    setEDisplay(acc.displayName);
-    setEPosition(acc.position);
-    setEPerms([...acc.permissions]);
-    setEPassword("");
-  };
-
-  const saveEdit = async () => {
-    if (!editId) return;
-    setESaving(true);
-    const payload: Parameters<typeof updateAdminAccount>[1] = {
-      displayName: eDisplay,
-      position: ePosition,
-      permissions: ePerms,
-    };
-    if (ePassword) payload.password = ePassword;
-    const res = await updateAdminAccount(editId, payload);
-    if (res?.ok) {
-      setAccounts((prev) => prev.map((a) => (a.id === editId ? res.account : a)));
-      setEditId(null);
-    }
-    setESaving(false);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Удалить аккаунт?")) return;
-    await deleteAdminAccount(id);
-    setAccounts((prev) => prev.filter((a) => a.id !== id));
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!cUsername.trim() || !cPassword) { setCError("Логин и пароль обязательны"); return; }
-    setCsaving(true);
-    setCError("");
-    const res = await createAdminAccount({
-      username: cUsername.trim(),
-      password: cPassword,
-      displayName: cDisplay || cUsername.trim(),
-      position: cPosition || "Администратор",
-      permissions: cPerms,
-    });
-    if (res?.ok) {
-      setAccounts((prev) => [...prev, res.account]);
-      setShowCreate(false);
-      setCUsername(""); setCPassword(""); setCDisplay(""); setCPosition(""); setCPerms(["view_admin"]);
-    } else {
-      setCError("Логин уже занят или ошибка сервера");
-    }
-    setCsaving(false);
-  };
-
-  const togglePerm = (perms: string[], p: string, set: (v: string[]) => void) => {
-    set(perms.includes(p) ? perms.filter((x) => x !== p) : [...perms, p]);
-  };
-
-  const inputCls = "w-full bg-[#0a0a12] border border-white/8 focus:border-[#9b2335]/30 text-white/70 font-['Oswald'] tracking-wide px-3 py-2.5 outline-none transition-colors";
-  const inputStyle = { fontSize: "0.82rem" };
-
+function StaffSelector({
+  staff,
+  onSelect,
+  onBack,
+}: {
+  staff: StaffMember[];
+  onSelect: (id: string) => void;
+  onBack: () => void;
+}) {
+  const activeStaff = staff.filter((s) => s.active);
   return (
-    <div>
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="font-['Russo_One'] text-white" style={{ fontSize: "1.5rem" }}>
-          Аккаунты
-        </h2>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={refresh}
-            className="text-white/20 hover:text-white/50 transition-colors"
-            title="Обновить"
-          >
-            <RefreshCw size={16} />
-          </button>
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="flex items-center gap-2 font-['Oswald'] uppercase tracking-wider text-white/60 hover:text-white border border-white/10 hover:border-white/20 px-4 py-2 transition-all"
-            style={{ fontSize: "0.7rem" }}
-          >
-            <Plus size={14} />
-            Добавить
-          </button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center px-4">
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#9b2335]/3 blur-[200px] rounded-full pointer-events-none" />
 
-      {/* Create form */}
-      <AnimatePresence>
-        {showCreate && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mb-6 border border-[#9b2335]/20 bg-[#9b2335]/[0.03] p-6"
-          >
-            <p className="font-['Oswald'] text-white/50 uppercase tracking-wider mb-5" style={{ fontSize: "0.7rem" }}>
-              Новый аккаунт
-            </p>
-            <form onSubmit={handleCreate} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input value={cUsername} onChange={(e) => setCUsername(e.target.value)} placeholder="Логин*" className={inputCls} style={inputStyle} />
-                <div className="relative">
-                  <input
-                    type={showCPass ? "text" : "password"}
-                    value={cPassword}
-                    onChange={(e) => setCPassword(e.target.value)}
-                    placeholder="Пароль*"
-                    className={inputCls + " pr-10"}
-                    style={inputStyle}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCPass(!showCPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50 transition-colors"
-                    title={showCPass ? "Скрыть" : "Показать"}
-                  >
-                    {showCPass ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
-                <input value={cDisplay} onChange={(e) => setCDisplay(e.target.value)} placeholder="Отображаемое имя" className={inputCls} style={inputStyle} />
-                <input value={cPosition} onChange={(e) => setCPosition(e.target.value)} placeholder="Должность" className={inputCls} style={inputStyle} />
-              </div>
-              <div>
-                <p className="font-['Oswald'] text-white/20 uppercase tracking-wider mb-2" style={{ fontSize: "0.62rem" }}>Права доступа</p>
-                <div className="flex flex-wrap gap-2">
-                  {ALL_PERMISSIONS.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => togglePerm(cPerms, p.id, setCPerms)}
-                      className={`font-['Oswald'] tracking-wide px-3 py-1.5 border text-xs transition-all ${
-                        cPerms.includes(p.id)
-                          ? "border-[#9b2335]/40 bg-[#9b2335]/10 text-[#9b2335]/80"
-                          : "border-white/8 text-white/25 hover:border-white/15"
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {cError && <p className="font-['Oswald'] text-[#ff3366]/60" style={{ fontSize: "0.7rem" }}>{cError}</p>}
-              <div className="flex gap-3 pt-1">
-                <button type="submit" disabled={cSaving} className="font-['Oswald'] uppercase tracking-wider text-white bg-[#9b2335] hover:bg-[#b52a40] px-6 py-2 transition-all disabled:opacity-40" style={{ fontSize: "0.7rem" }}>
-                  {cSaving ? "Создание..." : "Создать"}
-                </button>
-                <button type="button" onClick={() => setShowCreate(false)} className="font-['Oswald'] uppercase tracking-wider text-white/30 hover:text-white/60 px-4 py-2 transition-colors" style={{ fontSize: "0.7rem" }}>
-                  Отмена
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Accounts list */}
-      {loading ? (
-        <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.8rem" }}>Загрузка...</p>
-      ) : accounts.length === 0 ? (
-        <p className="font-['Oswald'] text-white/15 tracking-wide" style={{ fontSize: "0.8rem" }}>Аккаунты не найдены</p>
-      ) : (
-        <div className="space-y-3">
-          {accounts.map((acc) => (
-            <div key={acc.id} className="border border-white/5 bg-white/[0.01]">
-              {editId === acc.id ? (
-                /* Edit form */
-                <div className="p-5 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input value={eDisplay} onChange={(e) => setEDisplay(e.target.value)} placeholder="Отображаемое имя" className={inputCls} style={inputStyle} />
-                    <input value={ePosition} onChange={(e) => setEPosition(e.target.value)} placeholder="Должность" className={inputCls} style={inputStyle} />
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={showEPass ? "text" : "password"}
-                      value={ePassword}
-                      onChange={(e) => setEPassword(e.target.value)}
-                      placeholder="Новый пароль (оставьте пустым чтобы не менять)"
-                      className={inputCls + " pr-10"}
-                      style={inputStyle}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowEPass(!showEPass)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50 transition-colors"
-                    >
-                      {showEPass ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
-                  {!acc.isRoot && (
-                    <div>
-                      <p className="font-['Oswald'] text-white/20 uppercase tracking-wider mb-2" style={{ fontSize: "0.62rem" }}>Права доступа</p>
-                      <div className="flex flex-wrap gap-2">
-                        {ALL_PERMISSIONS.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => togglePerm(ePerms, p.id, setEPerms)}
-                            className={`font-['Oswald'] tracking-wide px-3 py-1.5 border text-xs transition-all ${
-                              ePerms.includes(p.id)
-                                ? "border-[#9b2335]/40 bg-[#9b2335]/10 text-[#9b2335]/80"
-                                : "border-white/8 text-white/25 hover:border-white/15"
-                            }`}
-                          >
-                            {p.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex gap-3 pt-1">
-                    <button onClick={saveEdit} disabled={eSaving} className="flex items-center gap-1.5 font-['Oswald'] uppercase tracking-wider text-white bg-[#9b2335] hover:bg-[#b52a40] px-5 py-2 transition-all disabled:opacity-40" style={{ fontSize: "0.68rem" }}>
-                      <Save size={13} /> {eSaving ? "Сохранение..." : "Сохранить"}
-                    </button>
-                    <button onClick={() => setEditId(null)} className="font-['Oswald'] uppercase tracking-wider text-white/30 hover:text-white/60 px-4 py-2 transition-colors" style={{ fontSize: "0.68rem" }}>
-                      Отмена
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* Account row */
-                <div className="flex items-center justify-between px-5 py-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#9b2335]/10 border border-[#9b2335]/15 shrink-0">
-                      {acc.isRoot ? <KeyRound size={14} className="text-[#9b2335]/60" /> : <User size={14} className="text-white/30" />}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-['Oswald'] text-white/80 tracking-wide" style={{ fontSize: "0.85rem" }}>
-                          {acc.displayName}
-                        </p>
-                        <span className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.65rem" }}>
-                          @{acc.username}
-                        </span>
-                        {acc.isRoot && (
-                          <span className="font-['Oswald'] text-[#9b2335]/60 border border-[#9b2335]/20 px-1.5 py-0.5 tracking-wider" style={{ fontSize: "0.55rem" }}>
-                            ROOT
-                          </span>
-                        )}
-                        {acc.id === currentAccountId && (
-                          <span className="font-['Oswald'] text-[#22c55e]/50 border border-[#22c55e]/15 px-1.5 py-0.5 tracking-wider" style={{ fontSize: "0.55rem" }}>
-                            ВЫ
-                          </span>
-                        )}
-                      </div>
-                      <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.65rem" }}>
-                        {acc.position} · {acc.permissions.includes("all") ? "Все права" : acc.permissions.join(", ")}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => startEdit(acc)}
-                      className="p-2 text-white/20 hover:text-white/60 transition-colors"
-                      title="Редактировать"
-                    >
-                      <Edit3 size={15} />
-                    </button>
-                    {!acc.isRoot && acc.id !== currentAccountId && (
-                      <button
-                        onClick={() => handleDelete(acc.id)}
-                        className="p-2 text-white/15 hover:text-[#ff3366]/60 transition-colors"
-                        title="Удалить"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="w-full max-w-md relative"
+      >
+        <div className="text-center mb-10">
+          <h1 className="font-['Russo_One'] text-[#9b2335]" style={{ fontSize: "1.5rem", letterSpacing: "0.05em" }}>
+            SCHWARZ FAMILY
+          </h1>
+          <p className="font-['Oswald'] text-white/20 uppercase tracking-[0.3em] mt-2" style={{ fontSize: "0.65rem" }}>
+            Выберите свой профиль
+          </p>
         </div>
-      )}
+
+        <div className="border border-white/8 bg-white/[0.02] p-6 space-y-2">
+          {activeStaff.map((s) => {
+            const permCount = s.permissions.length;
+            return (
+              <button
+                key={s.id}
+                onClick={() => onSelect(s.id)}
+                className="w-full flex items-center gap-4 p-4 border border-white/5 bg-white/[0.01] hover:border-[#9b2335]/20 hover:bg-[#9b2335]/[0.02] transition-all duration-300 group"
+              >
+                <div className="w-10 h-10 rounded-full flex items-center justify-center border border-[#9b2335]/15 bg-[#9b2335]/5 shrink-0">
+                  <User size={18} className="text-[#9b2335]/50" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-['Oswald'] text-white/70 tracking-wide group-hover:text-white/90 transition-colors" style={{ fontSize: "0.9rem" }}>
+                    {s.name}
+                  </p>
+                  <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.65rem" }}>
+                    {s.position} · {permCount} {permCount === 1 ? "право" : permCount < 5 ? "права" : "прав"}
+                  </p>
+                </div>
+                <ChevronRight size={14} className="text-white/10 group-hover:text-[#9b2335]/40 transition-colors shrink-0" />
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={onBack}
+          className="w-full mt-4 font-['Oswald'] text-white/15 uppercase tracking-wider hover:text-white/30 transition-colors py-2"
+          style={{ fontSize: "0.65rem" }}
+        >
+          ← Выйти из админки
+        </button>
+      </motion.div>
     </div>
   );
 }
@@ -2922,27 +2707,7 @@ export function AdminPage() {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem("schwarz_admin_auth") === "1");
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  // currentAccount stores the authenticated staff account (from API, persisted in sessionStorage)
-  const [currentAccount, setCurrentAccount] = useState<StaffAccountResponse | null>(() => {
-    try {
-      const raw = sessionStorage.getItem("schwarz_admin_account");
-      return raw ? (JSON.parse(raw) as StaffAccountResponse) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  // Derive currentStaff (StaffMember shape) from currentAccount for permission checks
-  const currentStaff: StaffMember | null = currentAccount
-    ? {
-        id: currentAccount.id,
-        name: currentAccount.displayName,
-        position: currentAccount.position,
-        permissions: currentAccount.permissions,
-        active: currentAccount.active,
-      }
-    : null;
+  const [currentStaffId, setCurrentStaffId] = useState<string | null>(() => sessionStorage.getItem("schwarz_admin_staff_id"));
 
   const [members, setMembersState] = useState<Member[]>(() => loadState("members", defaultMembers));
   const [leaderships, setLeadershipsState] = useState<Leadership[]>(() => loadState("leaderships", defaultLeaderships));
@@ -2954,64 +2719,27 @@ export function AdminPage() {
   const setMembers = (m: Member[]) => {
     setMembersState(m);
     saveState("members", m);
-    void putAdminSnapshot({ members: m });
   };
   const setLeaderships = (l: Leadership[]) => {
     setLeadershipsState(l);
     saveState("leaderships", l);
-    void putAdminSnapshot({ leaderships: l });
   };
   const setAnnouncements = (a: Announcement[]) => {
     setAnnouncementsState(a);
     saveState("announcements", a);
-    void putAdminSnapshot({ announcements: a });
   };
   const setRules = (r: Rule[]) => {
     setRulesState(r);
     saveState("rules", r);
-    void putAdminSnapshot({ rules: r });
   };
   const setPrinciples = (p: Principle[]) => {
     setPrinciplesState(p);
     saveState("principles", p);
-    void putAdminSnapshot({ principles: p });
   };
   const setStaff = (s: StaffMember[]) => {
     setStaffState(s);
     saveState("staff", s);
   };
-
-  // Sync all data from API on mount
-  useEffect(() => {
-    getAdminSnapshot().then((snap) => {
-      if (!snap) return;
-      if (Array.isArray(snap.members) && snap.members.length > 0) {
-        const m = snap.members as Member[];
-        setMembersState(m);
-        saveState("members", m);
-      }
-      if (Array.isArray(snap.leaderships) && snap.leaderships.length > 0) {
-        const l = snap.leaderships as Leadership[];
-        setLeadershipsState(l);
-        saveState("leaderships", l);
-      }
-      if (Array.isArray(snap.announcements) && snap.announcements.length > 0) {
-        const a = snap.announcements as Announcement[];
-        setAnnouncementsState(a);
-        saveState("announcements", a);
-      }
-      if (Array.isArray(snap.rules) && snap.rules.length > 0) {
-        const r = snap.rules as Rule[];
-        setRulesState(r);
-        saveState("rules", r);
-      }
-      if (Array.isArray(snap.principles) && snap.principles.length > 0) {
-        const p = snap.principles as Principle[];
-        setPrinciplesState(p);
-        saveState("principles", p);
-      }
-    });
-  }, []);
 
   // Pages & Navbar writable data
   const adminData = useAdminDataWritable();
@@ -3019,29 +2747,22 @@ export function AdminPage() {
 
   const handleLogout = () => {
     sessionStorage.removeItem("schwarz_admin_auth");
-    sessionStorage.removeItem("schwarz_admin_account");
+    sessionStorage.removeItem("schwarz_admin_staff_id");
     setAuthed(false);
-    setCurrentAccount(null);
+    setCurrentStaffId(null);
   };
 
-  const handleLogin = (account: StaffAccountResponse) => {
-    sessionStorage.setItem("schwarz_admin_auth", "1");
-    sessionStorage.setItem("schwarz_admin_account", JSON.stringify(account));
-    setAuthed(true);
-    setCurrentAccount(account);
-  };
-
+  const currentStaff = staffMembers.find((s) => s.id === currentStaffId && s.active);
   const allowedTabs: Tab[] | undefined = currentStaff
     ? (Object.entries(tabPermissions)
-        .filter(([, perm]) => {
-          if (!perm) return true;
-          return (
-            currentStaff.permissions.includes(perm) ||
-            currentStaff.permissions.includes("all")
-          );
-        })
+        .filter(([, perm]) => !perm || currentStaff.permissions.includes(perm))
         .map(([tab]) => tab as Tab))
     : undefined;
+
+  const handleSelectStaff = (id: string) => {
+    sessionStorage.setItem("schwarz_admin_staff_id", id);
+    setCurrentStaffId(id);
+  };
 
   const handleTabChange = (tab: Tab) => {
     if (allowedTabs && !allowedTabs.includes(tab)) return;
@@ -3049,12 +2770,11 @@ export function AdminPage() {
   };
 
   if (!authed) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return <LoginScreen onLogin={() => setAuthed(true)} />;
   }
 
-  if (!currentStaff) {
-    // Session exists but account missing — clear and re-login
-    return <LoginScreen onLogin={handleLogin} />;
+  if (!currentStaffId || !currentStaff) {
+    return <StaffSelector staff={staffMembers} onSelect={handleSelectStaff} onBack={handleLogout} />;
   }
 
   return (
@@ -3095,6 +2815,16 @@ export function AdminPage() {
             </span>
           </div>
           <div className="flex items-center gap-4">
+            {currentStaff && (
+              <button
+                onClick={() => { sessionStorage.removeItem("schwarz_admin_staff_id"); setCurrentStaffId(null); }}
+                className="font-['Oswald'] text-white/20 tracking-wide hover:text-white/40 transition-colors"
+                style={{ fontSize: "0.6rem" }}
+                title="Сменить профиль"
+              >
+                [ сменить ]
+              </button>
+            )}
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-[#9b2335]" />
               <span className="font-['Oswald'] text-white/25 tracking-wide" style={{ fontSize: "0.65rem" }}>
@@ -3147,10 +2877,25 @@ export function AdminPage() {
                 />
               )}
               {activeTab === "polls" && <PollsTab staffName={currentStaff?.name ?? "Admin"} />}
+              {activeTab === "news" && <NewsTab staffName={currentStaff?.name ?? "Admin"} />}
+              {activeTab === "moments" && <MomentsTab staffName={currentStaff?.name ?? "Admin"} />}
+              {activeTab === "webhooks" && <WebhooksTab />}
               {activeTab === "auditlog" && <AuditLogTab />}
               {activeTab === "settings" && <SettingsTab />}
-              {activeTab === "accounts" && <AccountsTab currentAccountId={currentAccount?.id ?? ""} />}
+              {activeTab === "accounts" && <AccountsTab />}
+              {activeTab === "vehicles" && <VehiclesAdminTab />}
+              {activeTab === "contracts_admin" && <ContractsAdminTab />}
+              {activeTab === "upgrades_admin" && <UpgradesAdminTab />}
+              {activeTab === "infrastructure_admin" && <InfrastructureAdminTab />}
               {activeTab === "telegram_bot" && <TelegramBotTab />}
+              {activeTab === "birthdays" && <BirthdaysTab />}
+              {activeTab === "system_status" && <SystemStatusTab />}
+              {activeTab === "role_templates" && <RoleTemplatesTab />}
+              {activeTab === "goals" && <FamilyGoalsTab staffName={currentStaff?.name ?? "Admin"} />}
+              {activeTab === "reports" && <ReportsTab staffName={currentStaff?.name ?? "Admin"} />}
+              {activeTab === "notifications" && <NotificationsAdminTab staffName={currentStaff?.name ?? "Admin"} />}
+              {activeTab === "treasury" && <TreasuryTab staffName={currentStaff?.name ?? "Admin"} />}
+              {activeTab === "stats_admin" && <StatsAdminTab />}
             </motion.div>
           </AnimatePresence>
         </div>

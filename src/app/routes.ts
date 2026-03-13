@@ -19,6 +19,7 @@ import { NewsArticlePage } from "./pages/NewsArticlePage";
 import { MomentsPage } from "./pages/MomentsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { CabinetPage } from "./pages/CabinetPage";
+import { StatsPage } from "./pages/StatsPage";
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
           { path: "news/:id", Component: NewsArticlePage },
           { path: "moments", Component: MomentsPage },
           { path: "page/:slug", Component: CustomPage },
+          { path: "stats", Component: StatsPage },
         ],
       },
       {

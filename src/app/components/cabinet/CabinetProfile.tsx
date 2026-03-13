@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   User, Camera, Save, Eye, EyeOff, CheckCircle2, Shield,
-  Calendar, PenLine, Cake, BadgeCheck,
+  Calendar, PenLine, Cake, BadgeCheck, Briefcase,
 } from "lucide-react";
 import type { Account } from "../../hooks/useAuth";
 import { ROLE_LABELS, ROLE_COLORS } from "../../hooks/useCabinetData";
@@ -66,6 +66,14 @@ function getZodiacEmoji(sign: string): string {
   };
   return map[sign] ?? "";
 }
+
+/* ── Specializations ── */
+export const SPECIALIZATIONS: { id: string; label: string; icon: string; desc: string; color: string }[] = [
+  { id: "trucker",  label: "Дальнобойщик", icon: "🚛", desc: "Перевозки грузов на дальние расстояния",        color: "#f59e0b" },
+  { id: "fisher",   label: "Рыбак",         icon: "🎣", desc: "Рыбные контракты и промысел",                   color: "#38bdf8" },
+  { id: "miner",    label: "Шахтёр",        icon: "⛏️", desc: "Добыча ресурсов и работа на шахтах",           color: "#a78bfa" },
+  { id: "delivery", label: "Доставщик",     icon: "📦", desc: "Товар со склада — доставка по точкам",         color: "#22c55e" },
+];
 
 /* ── Section header ── */
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -170,6 +178,13 @@ export function CabinetProfile({ account, updateAccount }: Props) {
   const inputStyle = { fontFamily: "'Oswald', sans-serif", fontSize: "0.85rem" };
   const labelStyle = { fontFamily: "'Oswald', sans-serif", fontSize: "0.58rem" };
 
+  /* specializations */
+  const specs: string[] = (account as any).specializations ?? [];
+  const toggleSpec = (id: string) => {
+    const next = specs.includes(id) ? specs.filter(s => s !== id) : [...specs, id];
+    updateAccount(account.id, { specializations: next } as any);
+  };
+
   return (
     <div className="space-y-8 max-w-3xl">
       {/* ── IC Identity card ── */}
@@ -251,6 +266,62 @@ export function CabinetProfile({ account, updateAccount }: Props) {
         </motion.div>
       </div>
 
+      {/* ── Specializations ── */}
+      <div>
+        <SectionTitle>Специализация в семье</SectionTitle>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}
+          className="border border-white/5 bg-white/[0.01] p-6"
+        >
+          <p className="text-white/20 mb-5 leading-relaxed"
+            style={{ fontFamily: "'Oswald', sans-serif", fontSize: "0.72rem" }}>
+            Выбери направления, в которых ты работаешь. Теги появятся в профильной карточке и помогут распределять контракты.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {SPECIALIZATIONS.map(sp => {
+              const active = specs.includes(sp.id);
+              return (
+                <button
+                  key={sp.id}
+                  onClick={() => toggleSpec(sp.id)}
+                  className="relative flex items-center gap-4 p-4 border text-left transition-all duration-200 group"
+                  style={{
+                    background: active ? `${sp.color}08` : "rgba(255,255,255,0.01)",
+                    borderColor: active ? `${sp.color}40` : "rgba(255,255,255,0.06)",
+                  }}
+                >
+                  {/* Active indicator */}
+                  {active && (
+                    <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full" style={{ background: sp.color }} />
+                  )}
+                  <span className="text-2xl shrink-0">{sp.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="uppercase tracking-wider"
+                      style={{
+                        fontFamily: "'Oswald', sans-serif", fontSize: "0.78rem",
+                        color: active ? sp.color : "rgba(255,255,255,0.5)",
+                      }}>
+                      {sp.label}
+                    </p>
+                    <p className="text-white/20 mt-0.5"
+                      style={{ fontFamily: "'Oswald', sans-serif", fontSize: "0.6rem" }}>
+                      {sp.desc}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {specs.length > 0 && (
+            <p className="mt-4 text-white/20 flex items-center gap-2"
+              style={{ fontFamily: "'Oswald', sans-serif", fontSize: "0.6rem" }}>
+              <CheckCircle2 size={12} className="text-[#22c55e]/50" />
+              Выбрано: {specs.length} из {SPECIALIZATIONS.length}. Изменения сохраняются автоматически.
+            </p>
+          )}
+        </motion.div>
+      </div>
+
       {/* ── Personal settings ── */}
       <div>
         <SectionTitle>Настройки профиля</SectionTitle>
@@ -301,6 +372,24 @@ export function CabinetProfile({ account, updateAccount }: Props) {
                   </p>
                 ) : null;
               })()}
+              {/* Birthday visibility toggle */}
+              <button
+                type="button"
+                onClick={() => updateAccount(account.id, { birthdayPublic: !account.birthdayPublic })}
+                className="mt-2 flex items-center gap-2 transition-colors"
+              >
+                <div
+                  className="w-4 h-4 border flex items-center justify-center transition-all"
+                  style={{ borderColor: account.birthdayPublic ? "rgba(155,35,53,0.4)" : "rgba(255,255,255,0.12)", background: account.birthdayPublic ? "rgba(155,35,53,0.12)" : "transparent" }}
+                >
+                  {account.birthdayPublic && (
+                    <div className="w-2 h-2 bg-[#9b2335]" />
+                  )}
+                </div>
+                <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: "0.6rem", color: account.birthdayPublic ? "rgba(155,35,53,0.6)" : "rgba(255,255,255,0.2)" }}>
+                  {account.birthdayPublic ? "🌐 Видна публично (на сайте)" : "🔒 Внутренняя (только ЛК и администраторы)"}
+                </span>
+              </button>
             </div>
 
             {/* Bio */}

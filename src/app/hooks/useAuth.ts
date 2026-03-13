@@ -36,9 +36,10 @@ export interface Account {
   avatarDataUrl?: string;
   coverDataUrl?: string;
   realName?: string;
-  birthday?: string; // "YYYY-MM-DD"
+  birthday?: string;
   bio?: string;
-  specializations?: string[];
+  specializations?: string[]; // e.g. ["trucker","fisher","miner","delivery"]
+  birthdayPublic?: boolean;   // show birthday to public pages (default: false = internal only)
   // Telegram
   telegramId?: string;
   telegramUsername?: string;
