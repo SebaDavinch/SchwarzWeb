@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { listGoals, putGoals } from "../api/endpoints";
 
 /* ═══════════════════════════════════════════════
    TYPES
@@ -149,9 +150,17 @@ export function loadPublicGoals(): FamilyGoal[] {
 export function useFamilyGoals() {
   const [goals, setGoalsState] = useState<FamilyGoal[]>(() => loadGoals());
 
+  // Sync from API on mount
+  useEffect(() => {
+    listGoals<FamilyGoal>()
+      .then((data) => { if (Array.isArray(data) && data.length > 0) { setGoalsState(data); saveGoals(data); } })
+      .catch(() => {});
+  }, []);
+
   const persist = useCallback((g: FamilyGoal[]) => {
     setGoalsState(g);
     saveGoals(g);
+    putGoals(g).catch(() => {});
   }, []);
 
   const addGoal = (data: Omit<FamilyGoal, "id" | "createdAt">) => {

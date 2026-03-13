@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { listReports, putReports, createReportEntry } from "../api/endpoints";
 
 /* ═══════════════════════════════════════════════
    TYPES
@@ -73,8 +74,8 @@ export function submitReport(data: Omit<Report, "id" | "submittedAt" | "status">
     submittedAt: new Date().toISOString(),
     status: "open",
   };
-  save([report, ...reports]);
-
+  save([report, ...reports]);  // Also POST to API (fire-and-forget)
+  createReportEntry(report).catch(() => {});
   try {
     const raw = localStorage.getItem("schwarz_admin_discordWebhook");
     const cfg = raw ? JSON.parse(raw) : {};
@@ -116,9 +117,17 @@ export function loadMyReports(accountId: string): Report[] {
 export function useReports() {
   const [reports, setReportsState] = useState<Report[]>(() => load());
 
+  // Sync from API on mount
+  useEffect(() => {
+    listReports<Report>()
+      .then((data) => { if (Array.isArray(data)) { setReportsState(data); save(data); } })
+      .catch(() => {});
+  }, []);
+
   const persist = useCallback((r: Report[]) => {
     setReportsState(r);
     save(r);
+    putReports(r).catch(() => {});
   }, []);
 
   const updateReport = (id: string, changes: Partial<Report>) => {

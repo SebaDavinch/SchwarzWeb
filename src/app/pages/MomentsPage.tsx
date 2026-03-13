@@ -11,6 +11,7 @@ import {
   getTwitchClipSlug, getEmbedUrl, notifyMomentSubmittedToAdmins,
   type Moment, type MomentCategory, type MomentMediaType,
 } from "../hooks/useMoments";
+import { listMoments as listMomentsAPI, createMoment } from "../api/endpoints";
 
 /* ─── helpers ─── */
 function formatDate(iso: string) {
@@ -232,19 +233,24 @@ function SubmitModal({ onClose }: { onClose: () => void }) {
   const handleSubmit = async () => {
     setStatus("sending");
     try {
-      const all = loadMoments();
       const thumbUrl = form.mediaType === "youtube" && form.videoUrl ? getYouTubeThumbnail(form.videoUrl) : form.url;
-      const newMoment: Moment = {
-        id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      const payload: Omit<Moment, "id"> = {
         title: form.title, description: form.description || undefined,
         url: thumbUrl || form.url, videoUrl: form.videoUrl || undefined,
         mediaType: form.mediaType, category: form.category,
         date: form.date, author: form.author,
-        featured: false, visible: true, order: all.length + 1,
+        featured: false, visible: true, order: 0,
         status: "pending", submittedAt: new Date().toISOString(),
       };
-      saveMomentsPublic([...all, newMoment]);
-      await notifyMomentSubmittedToAdmins(newMoment);
+      // Try API first, fall back to localStorage
+      try {
+        await createMoment(payload);
+      } catch {
+        const all = loadMoments();
+        const newMoment: Moment = { ...payload, id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), order: all.length + 1 };
+        saveMomentsPublic([...all, newMoment]);
+        await notifyMomentSubmittedToAdmins(newMoment);
+      }
       setStatus("done");
     } catch {
       setStatus("error");
@@ -400,8 +406,18 @@ export function MomentsPage() {
   const [mediaFilter, setMediaFilter] = useState<"all" | "photo" | "video">("all");
 
   useEffect(() => {
-    // Only show approved + visible moments
-    setMoments(loadMoments().filter((m) => m.status === "approved" && m.visible));
+    // Fetch from API, fall back to localStorage
+    listMomentsAPI<Moment>()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMoments(data.filter((m) => m.status === "approved" && m.visible));
+        } else {
+          setMoments(loadMoments().filter((m) => m.status === "approved" && m.visible));
+        }
+      })
+      .catch(() => {
+        setMoments(loadMoments().filter((m) => m.status === "approved" && m.visible));
+      });
   }, []);
 
   const filtered = moments.filter((m) => {

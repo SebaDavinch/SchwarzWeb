@@ -310,3 +310,78 @@ export async function broadcastTelegram(chatIds: string[], text: string) {
     body: JSON.stringify({ chatIds, text }),
   });
 }
+
+/* ─── Birthdays ─── */
+
+export async function listBirthdayEntries<T>() {
+  return requestJson<T[]>("/birthdays", { method: "GET" });
+}
+export async function putBirthdayEntries<T>(payload: T[]) {
+  return requestVoid("/birthdays", { method: "PUT", body: JSON.stringify(payload) });
+}
+export async function createBirthdayEntry<T>(payload: T) {
+  return requestJson<{ ok: boolean; entry: T }>("/birthdays", { method: "POST", body: JSON.stringify(payload) });
+}
+export async function updateBirthdayEntry<T>(id: string, payload: Partial<T>) {
+  return requestVoid(`/birthdays/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+export async function deleteBirthdayEntry(id: string) {
+  return requestVoid(`/birthdays/${id}`, { method: "DELETE" });
+}
+export async function getBirthdayNotifConfigAPI<T>() {
+  return requestJson<T | null>("/birthdays/notif-config", { method: "GET" });
+}
+export async function putBirthdayNotifConfigAPI<T>(payload: T) {
+  return requestVoid("/birthdays/notif-config", { method: "PUT", body: JSON.stringify(payload) });
+}
+
+/* ─── Family Goals ─── */
+
+export async function listGoals<T>() {
+  return requestJson<T[]>("/goals", { method: "GET" });
+}
+export async function putGoals<T>(payload: T[]) {
+  return requestVoid("/goals", { method: "PUT", body: JSON.stringify(payload) });
+}
+export async function createGoal<T>(payload: T) {
+  return requestJson<{ ok: boolean; goal: T }>("/goals", { method: "POST", body: JSON.stringify(payload) });
+}
+export async function updateGoalById<T>(id: string, payload: Partial<T>) {
+  return requestVoid(`/goals/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+export async function deleteGoalById(id: string) {
+  return requestVoid(`/goals/${id}`, { method: "DELETE" });
+}
+
+/* ─── Treasury ─── */
+
+export async function listTreasury<T>() {
+  return requestJson<T[]>("/treasury", { method: "GET" });
+}
+export async function putTreasury<T>(payload: T[]) {
+  return requestVoid("/treasury", { method: "PUT", body: JSON.stringify(payload) });
+}
+export async function createTreasuryTransaction<T>(payload: T) {
+  return requestJson<{ ok: boolean; tx: T }>("/treasury", { method: "POST", body: JSON.stringify(payload) });
+}
+export async function deleteTreasuryTransaction(id: string) {
+  return requestVoid(`/treasury/${id}`, { method: "DELETE" });
+}
+
+/* ─── Reports ─── */
+
+export async function listReports<T>() {
+  return requestJson<T[]>("/reports", { method: "GET" });
+}
+export async function putReports<T>(payload: T[]) {
+  return requestVoid("/reports", { method: "PUT", body: JSON.stringify(payload) });
+}
+export async function createReportEntry<T>(payload: T) {
+  return requestJson<{ ok: boolean; report: T }>("/reports", { method: "POST", body: JSON.stringify(payload) });
+}
+export async function updateReportEntry<T>(id: string, payload: Partial<T>) {
+  return requestVoid(`/reports/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+export async function deleteReportEntry(id: string) {
+  return requestVoid(`/reports/${id}`, { method: "DELETE" });
+}

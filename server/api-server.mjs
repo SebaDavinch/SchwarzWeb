@@ -57,6 +57,11 @@ const defaultDb = {
   polls: [],
   pollVoters: {},
   staffAccounts: [],
+  birthdays: [],
+  birthdayNotifConfig: null,
+  goals: [],
+  treasury: [],
+  reports: [],
 };
 
 function ensureDb() {
@@ -840,6 +845,163 @@ app.get("/api/webhooks/events", (_req, res) => {
 app.put("/api/webhooks/events", (req, res) => {
   const db = readDb();
   db.webhookEvents = req.body;
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   BIRTHDAYS
+───────────────────────────────────────── */
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// notif-config MUST come before /:id to avoid Express matching "notif-config" as an id
+app.get("/api/birthdays/notif-config", (_req, res) => {
+  const db = readDb();
+  res.json(db.birthdayNotifConfig ?? null);
+});
+app.put("/api/birthdays/notif-config", (req, res) => {
+  const db = readDb();
+  db.birthdayNotifConfig = req.body;
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.get("/api/birthdays", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.birthdays) ? db.birthdays : []);
+});
+app.put("/api/birthdays", (req, res) => {
+  const db = readDb();
+  db.birthdays = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+app.post("/api/birthdays", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.birthdays)) db.birthdays = [];
+  const entry = { id: genId(), createdAt: new Date().toISOString(), ...req.body };
+  db.birthdays.push(entry);
+  writeDb(db);
+  res.status(201).json({ ok: true, entry });
+});
+app.patch("/api/birthdays/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.birthdays)) return res.status(404).json({ ok: false });
+  db.birthdays = db.birthdays.map((e) => e.id === req.params.id ? { ...e, ...(req.body || {}) } : e);
+  writeDb(db);
+  res.json({ ok: true });
+});
+app.delete("/api/birthdays/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.birthdays)) return res.status(404).json({ ok: false });
+  db.birthdays = db.birthdays.filter((e) => e.id !== req.params.id);
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   FAMILY GOALS
+───────────────────────────────────────── */
+
+app.get("/api/goals", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.goals) ? db.goals : []);
+});
+app.put("/api/goals", (req, res) => {
+  const db = readDb();
+  db.goals = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+app.post("/api/goals", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.goals)) db.goals = [];
+  const goal = { id: genId(), createdAt: new Date().toISOString(), ...req.body };
+  db.goals.unshift(goal);
+  writeDb(db);
+  res.status(201).json({ ok: true, goal });
+});
+app.patch("/api/goals/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.goals)) return res.status(404).json({ ok: false });
+  db.goals = db.goals.map((g) => g.id === req.params.id ? { ...g, ...(req.body || {}) } : g);
+  writeDb(db);
+  res.json({ ok: true });
+});
+app.delete("/api/goals/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.goals)) return res.status(404).json({ ok: false });
+  db.goals = db.goals.filter((g) => g.id !== req.params.id);
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   TREASURY
+───────────────────────────────────────── */
+
+app.get("/api/treasury", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.treasury) ? db.treasury : []);
+});
+app.put("/api/treasury", (req, res) => {
+  const db = readDb();
+  db.treasury = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+app.post("/api/treasury", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.treasury)) db.treasury = [];
+  const tx = { id: genId(), createdAt: new Date().toISOString(), ...req.body };
+  db.treasury.unshift(tx);
+  writeDb(db);
+  res.status(201).json({ ok: true, tx });
+});
+app.delete("/api/treasury/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.treasury)) return res.status(404).json({ ok: false });
+  db.treasury = db.treasury.filter((t) => t.id !== req.params.id);
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   REPORTS
+───────────────────────────────────────── */
+
+app.get("/api/reports", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.reports) ? db.reports : []);
+});
+app.put("/api/reports", (req, res) => {
+  const db = readDb();
+  db.reports = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true });
+});
+app.post("/api/reports", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.reports)) db.reports = [];
+  const report = { id: genId(), submittedAt: new Date().toISOString(), status: "open", ...req.body };
+  db.reports.unshift(report);
+  writeDb(db);
+  res.status(201).json({ ok: true, report });
+});
+app.patch("/api/reports/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.reports)) return res.status(404).json({ ok: false });
+  db.reports = db.reports.map((r) => r.id === req.params.id ? { ...r, ...(req.body || {}) } : r);
+  writeDb(db);
+  res.json({ ok: true });
+});
+app.delete("/api/reports/:id", (req, res) => {
+  const db = readDb();
+  if (!Array.isArray(db.reports)) return res.status(404).json({ ok: false });
+  db.reports = db.reports.filter((r) => r.id !== req.params.id);
   writeDb(db);
   res.json({ ok: true });
 });

@@ -1,4 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import {
+  listBirthdayEntries,
+  putBirthdayEntries,
+  getBirthdayNotifConfigAPI,
+  putBirthdayNotifConfigAPI,
+} from "../api/endpoints";
 
 /* ═══════════════════════════════════════════════
    STORAGE HELPERS
@@ -359,14 +365,26 @@ export function useBirthdays() {
     load("birthdayNotifConfig", DEFAULT_NOTIF_CONFIG)
   );
 
+  // Sync from API on mount
+  useEffect(() => {
+    listBirthdayEntries<BirthdayEntry>()
+      .then((data) => { if (Array.isArray(data)) { setEntriesState(data); save("birthdays", data); } })
+      .catch(() => {});
+    getBirthdayNotifConfigAPI<BirthdayNotifConfig>()
+      .then((data) => { if (data) { setNotifConfigState(data); save("birthdayNotifConfig", data); } })
+      .catch(() => {});
+  }, []);
+
   const setEntries = useCallback((e: BirthdayEntry[]) => {
     setEntriesState(e);
     save("birthdays", e);
+    putBirthdayEntries(e).catch(() => {});
   }, []);
 
   const setNotifConfig = useCallback((c: BirthdayNotifConfig) => {
     setNotifConfigState(c);
     save("birthdayNotifConfig", c);
+    putBirthdayNotifConfigAPI(c).catch(() => {});
   }, []);
 
   const addEntry = (data: Omit<BirthdayEntry, "id" | "createdAt" | "source">) => {

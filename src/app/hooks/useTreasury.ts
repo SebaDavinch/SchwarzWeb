@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { listTreasury, putTreasury } from "../api/endpoints";
 
 /* ═══════════════════════════════════════════════
    TYPES
@@ -106,9 +107,17 @@ function genId() {
 export function useTreasury() {
   const [transactions, setTx] = useState<TreasuryTransaction[]>(() => loadTx());
 
+  // Sync from API on mount
+  useEffect(() => {
+    listTreasury<TreasuryTransaction>()
+      .then((data) => { if (Array.isArray(data) && data.length > 0) { setTx(data); saveTx(data); } })
+      .catch(() => {});
+  }, []);
+
   const persist = useCallback((txs: TreasuryTransaction[]) => {
     setTx(txs);
     saveTx(txs);
+    putTreasury(txs).catch(() => {});
   }, []);
 
   const addTransaction = (data: Omit<TreasuryTransaction, "id" | "createdAt">) => {

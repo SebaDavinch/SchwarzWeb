@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════
    useMoments — shared hook + types for Moments
    ═══════════════════════════════════════════════ */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { listMoments as listMomentsAPI, putMoments } from "../api/endpoints";
 
 /* ─── Category ─── */
 export type MomentCategory =
@@ -130,9 +131,22 @@ function genId() {
 export function useMoments() {
   const [moments, setMomentsState] = useState<Moment[]>(() => loadMoments());
 
+  // Sync from API on mount
+  useEffect(() => {
+    listMomentsAPI<Moment>()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMomentsState(data);
+          saveMoments(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const persist = useCallback((updated: Moment[]) => {
     setMomentsState(updated);
     saveMoments(updated);
+    putMoments(updated).catch(() => {});
   }, []);
 
   const addMoment = (data: Omit<Moment, "id" | "order" | "submittedAt">) => {
