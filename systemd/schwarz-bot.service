@@ -1,0 +1,27 @@
+[Unit]
+Description=Schwarz Family Telegram Bot
+Documentation=https://github.com/SebaDavinch/SchwarzWeb
+After=network.target schwarz-api.service
+Wants=schwarz-api.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/var/www/schwarzweb
+
+# Load environment from .env file
+EnvironmentFile=/var/www/schwarzweb/.env
+
+ExecStart=/usr/bin/node bot/bot.mjs
+
+# Restart settings
+Restart=on-failure
+RestartSec=5s
+
+# Logs go to journald — view with: journalctl -u schwarz-bot -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=schwarz-bot
+
+[Install]
+WantedBy=multi-user.target

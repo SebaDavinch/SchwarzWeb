@@ -1,0 +1,26 @@
+[Unit]
+Description=Schwarz Family API Server
+Documentation=https://github.com/SebaDavinch/SchwarzWeb
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/var/www/schwarzweb
+
+# Load environment from .env file
+EnvironmentFile=/var/www/schwarzweb/.env
+
+ExecStart=/usr/bin/node server/api-server.mjs
+
+# Restart settings
+Restart=on-failure
+RestartSec=3s
+
+# Logs go to journald — view with: journalctl -u schwarz-api -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=schwarz-api
+
+[Install]
+WantedBy=multi-user.target
