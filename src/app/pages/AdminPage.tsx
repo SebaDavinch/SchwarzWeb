@@ -2603,6 +2603,7 @@ function AccountsTab({ currentAccountId }: { currentAccountId: string }) {
   // Create form
   const [cUsername, setCUsername] = useState("");
   const [cPassword, setCPassword] = useState("");
+  const [showCPass, setShowCPass] = useState(true); // visible by default so admin can copy
   const [cDisplay, setCDisplay] = useState("");
   const [cPosition, setCPosition] = useState("");
   const [cPerms, setCPerms] = useState<string[]>(["view_admin"]);
@@ -2614,6 +2615,7 @@ function AccountsTab({ currentAccountId }: { currentAccountId: string }) {
   const [ePosition, setEPosition] = useState("");
   const [ePerms, setEPerms] = useState<string[]>([]);
   const [ePassword, setEPassword] = useState("");
+  const [showEPass, setShowEPass] = useState(false);
   const [eSaving, setESaving] = useState(false);
 
   const refresh = async () => {
@@ -2725,7 +2727,24 @@ function AccountsTab({ currentAccountId }: { currentAccountId: string }) {
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input value={cUsername} onChange={(e) => setCUsername(e.target.value)} placeholder="Логин*" className={inputCls} style={inputStyle} />
-                <input type="password" value={cPassword} onChange={(e) => setCPassword(e.target.value)} placeholder="Пароль*" className={inputCls} style={inputStyle} />
+                <div className="relative">
+                  <input
+                    type={showCPass ? "text" : "password"}
+                    value={cPassword}
+                    onChange={(e) => setCPassword(e.target.value)}
+                    placeholder="Пароль*"
+                    className={inputCls + " pr-10"}
+                    style={inputStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCPass(!showCPass)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50 transition-colors"
+                    title={showCPass ? "Скрыть" : "Показать"}
+                  >
+                    {showCPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
                 <input value={cDisplay} onChange={(e) => setCDisplay(e.target.value)} placeholder="Отображаемое имя" className={inputCls} style={inputStyle} />
                 <input value={cPosition} onChange={(e) => setCPosition(e.target.value)} placeholder="Должность" className={inputCls} style={inputStyle} />
               </div>
@@ -2778,7 +2797,23 @@ function AccountsTab({ currentAccountId }: { currentAccountId: string }) {
                     <input value={eDisplay} onChange={(e) => setEDisplay(e.target.value)} placeholder="Отображаемое имя" className={inputCls} style={inputStyle} />
                     <input value={ePosition} onChange={(e) => setEPosition(e.target.value)} placeholder="Должность" className={inputCls} style={inputStyle} />
                   </div>
-                  <input type="password" value={ePassword} onChange={(e) => setEPassword(e.target.value)} placeholder="Новый пароль (оставьте пустым чтобы не менять)" className={inputCls} style={inputStyle} />
+                  <div className="relative">
+                    <input
+                      type={showEPass ? "text" : "password"}
+                      value={ePassword}
+                      onChange={(e) => setEPassword(e.target.value)}
+                      placeholder="Новый пароль (оставьте пустым чтобы не менять)"
+                      className={inputCls + " pr-10"}
+                      style={inputStyle}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEPass(!showEPass)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50 transition-colors"
+                    >
+                      {showEPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                   {!acc.isRoot && (
                     <div>
                       <p className="font-['Oswald'] text-white/20 uppercase tracking-wider mb-2" style={{ fontSize: "0.62rem" }}>Права доступа</p>

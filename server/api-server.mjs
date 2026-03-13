@@ -326,14 +326,20 @@ app.delete("/api/moments/:id", (req, res) => {
 app.post("/api/auth/login", (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
-    return res.status(400).json({ ok: false, message: "username and password required" });
+    return res.json({ ok: false, message: "username and password required" });
   }
   const db = readDb();
   const accounts = Array.isArray(db.staffAccounts) ? db.staffAccounts : [];
   const account = accounts.find((a) => a.username === username && a.active !== false);
-  if (!account || !verifyPassword(password, account.passwordHash)) {
-    return res.status(401).json({ ok: false, message: "Неверный логин или пароль" });
+  if (!account) {
+    console.log(`[auth] login failed: username "${username}" not found (total accounts: ${accounts.length})`);
+    return res.json({ ok: false, message: "Неверный логин или пароль" });
   }
+  if (!verifyPassword(password, account.passwordHash)) {
+    console.log(`[auth] login failed: wrong password for "${username}"`);
+    return res.json({ ok: false, message: "Неверный логин или пароль" });
+  }
+  console.log(`[auth] login success: "${username}"`);
   res.json({ ok: true, account: safeAccount(account) });
 });
 
@@ -353,6 +359,7 @@ app.post("/api/auth/accounts", (req, res) => {
   if (db.staffAccounts.some((a) => a.username === username)) {
     return res.status(409).json({ ok: false, message: "Логин уже занят" });
   }
+  console.log(`[auth] creating account: "${username}"`);
   const newAccount = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     username,
