@@ -9,6 +9,10 @@
     "bot": "node bot/bot.mjs",
     "build": "tsc -b && vite build",
     "start": "node server/api-server.mjs",
+    "services": "npx pm2 start ecosystem.config.cjs",
+    "services:stop": "npx pm2 stop all",
+    "services:logs": "npx pm2 logs",
+    "services:status": "npx pm2 status",
     "lint": "eslint .",
     "preview": "vite preview"
   },
