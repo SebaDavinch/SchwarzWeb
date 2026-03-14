@@ -28,18 +28,18 @@ sudo systemctl stop schwarz
 # ── 2. Скопировать файлы ────────────────────────────────────
 echo "[2/4] Copying files ..."
 
-rsync -a --delete \
-  --exclude=".env" \
-  --exclude="node_modules" \
-  --exclude=".data" \
-  "$RELEASE_DIR/dist/"   "$APP_DIR/dist/"
+rm -rf "$APP_DIR/dist"
+cp -r "$RELEASE_DIR/dist" "$APP_DIR/dist"
 
-rsync -a "$RELEASE_DIR/server/"           "$APP_DIR/server/"
-rsync -a "$RELEASE_DIR/package.json"      "$APP_DIR/package.json"
-rsync -a "$RELEASE_DIR/package-lock.json" "$APP_DIR/package-lock.json"
+rm -rf "$APP_DIR/server"
+cp -r "$RELEASE_DIR/server" "$APP_DIR/server"
+
+cp "$RELEASE_DIR/package.json"      "$APP_DIR/package.json"
+cp "$RELEASE_DIR/package-lock.json" "$APP_DIR/package-lock.json"
 
 if [ -d "$RELEASE_DIR/bot" ]; then
-  rsync -a "$RELEASE_DIR/bot/" "$APP_DIR/bot/"
+  rm -rf "$APP_DIR/bot"
+  cp -r "$RELEASE_DIR/bot" "$APP_DIR/bot"
 fi
 
 # ── 3. Зависимости ──────────────────────────────────────────
