@@ -57,6 +57,12 @@ const defaultDb = {
   polls: [],
   pollVoters: {},
   staffAccounts: [],
+  adminStaff: [],
+  cabinetAccounts: [],
+  roleTemplates: [],
+  adminNotifications: [],
+  achievementDefs: [],
+  userAchievements: [],
   birthdays: [],
   birthdayNotifConfig: null,
   goals: [],
@@ -102,6 +108,19 @@ app.put("/api/admin/snapshot", (req, res) => {
   };
   writeDb(db);
   res.json({ ok: true, adminSnapshot: db.adminSnapshot });
+});
+
+/* ─── Admin staff (login credentials, stored server-side) ─── */
+app.get("/api/admin/staff", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.adminStaff) ? db.adminStaff : []);
+});
+
+app.put("/api/admin/staff", (req, res) => {
+  const db = readDb();
+  db.adminStaff = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true, count: db.adminStaff.length });
 });
 
 app.get("/api/applications", (_req, res) => {
@@ -1004,6 +1023,86 @@ app.delete("/api/reports/:id", (req, res) => {
   db.reports = db.reports.filter((r) => r.id !== req.params.id);
   writeDb(db);
   res.json({ ok: true });
+});
+
+/* ─────────────────────────────────────────
+   CABINET ACCOUNTS (ЛК member accounts)
+───────────────────────────────────────── */
+
+app.get("/api/cabinet/accounts", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.cabinetAccounts) ? db.cabinetAccounts : []);
+});
+
+app.put("/api/cabinet/accounts", (req, res) => {
+  const db = readDb();
+  db.cabinetAccounts = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true, count: db.cabinetAccounts.length });
+});
+
+/* ─────────────────────────────────────────
+   ROLE TEMPLATES
+───────────────────────────────────────── */
+
+app.get("/api/role-templates", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.roleTemplates) ? db.roleTemplates : []);
+});
+
+app.put("/api/role-templates", (req, res) => {
+  const db = readDb();
+  db.roleTemplates = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true, count: db.roleTemplates.length });
+});
+
+/* ─────────────────────────────────────────
+   ADMIN NOTIFICATIONS
+───────────────────────────────────────── */
+
+app.get("/api/notifications", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.adminNotifications) ? db.adminNotifications : []);
+});
+
+app.put("/api/notifications", (req, res) => {
+  const db = readDb();
+  db.adminNotifications = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true, count: db.adminNotifications.length });
+});
+
+/* ─────────────────────────────────────────
+   ACHIEVEMENT DEFS
+───────────────────────────────────────── */
+
+app.get("/api/achievement-defs", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.achievementDefs) ? db.achievementDefs : []);
+});
+
+app.put("/api/achievement-defs", (req, res) => {
+  const db = readDb();
+  db.achievementDefs = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true, count: db.achievementDefs.length });
+});
+
+/* ─────────────────────────────────────────
+   USER ACHIEVEMENTS
+───────────────────────────────────────── */
+
+app.get("/api/user-achievements", (_req, res) => {
+  const db = readDb();
+  res.json(Array.isArray(db.userAchievements) ? db.userAchievements : []);
+});
+
+app.put("/api/user-achievements", (req, res) => {
+  const db = readDb();
+  db.userAchievements = Array.isArray(req.body) ? req.body : [];
+  writeDb(db);
+  res.json({ ok: true, count: db.userAchievements.length });
 });
 
 // Serve built frontend (production)

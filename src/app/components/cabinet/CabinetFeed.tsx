@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "motion/react";
 import {
   Megaphone, Newspaper, AlertTriangle, Info, CheckCircle2,
@@ -83,6 +83,23 @@ function UserAvatar({ url, name }: { url?: string; name?: string }) {
 }
 
 export function CabinetFeed({ notifications, memberName, avatarUrl }: Props) {
+  // Fetch announcements and news from API (fallback to localStorage)
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+    try { const r = localStorage.getItem("schwarz_admin_announcements"); return r ? JSON.parse(r) : []; } catch { return []; }
+  });
+  const [newsItems, setNewsItems] = useState<NewsItem[]>(() => {
+    try { const r = localStorage.getItem("schwarz_admin_news"); return r ? JSON.parse(r) : []; } catch { return []; }
+  });
+
+  useEffect(() => {
+    fetch("/api/admin/snapshot").then(r => r.json()).then((s: { announcements?: Announcement[] }) => {
+      if (Array.isArray(s.announcements)) setAnnouncements(s.announcements);
+    }).catch(() => {});
+    fetch("/api/news").then(r => r.json()).then((d: NewsItem[]) => {
+      if (Array.isArray(d)) setNewsItems(d);
+    }).catch(() => {});
+  }, []);
+
   // Birthdays for internal sidebar widget
   const upcomingBirthdays = useMemo(() => {
     const all = getAllBirthdays();
@@ -96,22 +113,12 @@ export function CabinetFeed({ notifications, memberName, avatarUrl }: Props) {
 
   const feed = useMemo<FeedItem[]>(() => {
     const items: FeedItem[] = [];
-    try {
-      const raw = localStorage.getItem("schwarz_admin_announcements");
-      if (raw) {
-        (JSON.parse(raw) as Announcement[]).forEach(a =>
-          items.push({ id: `ann_${a.id}`, kind: "announcement", title: a.title, text: a.text, date: a.date, priority: a.priority, pinned: a.pinned })
-        );
-      }
-    } catch { /* */ }
-    try {
-      const raw = localStorage.getItem("schwarz_admin_news");
-      if (raw) {
-        (JSON.parse(raw) as NewsItem[]).slice(0, 6).forEach(n =>
-          items.push({ id: `news_${n.id}`, kind: "news", title: n.title, text: n.summary || "", date: n.date, author: n.author, newsId: n.id })
-        );
-      }
-    } catch { /* */ }
+    announcements.forEach(a =>
+      items.push({ id: `ann_${a.id}`, kind: "announcement", title: a.title, text: a.text, date: a.date, priority: a.priority, pinned: a.pinned })
+    );
+    newsItems.slice(0, 6).forEach(n =>
+      items.push({ id: `news_${n.id}`, kind: "news", title: n.title, text: n.summary || "", date: n.date, author: n.author, newsId: n.id })
+    );
     notifications.forEach(n =>
       items.push({ id: `notif_${n.id}`, kind: "notification", title: n.title, text: n.text, date: n.createdAt, priority: n.type })
     );
@@ -120,7 +127,7 @@ export function CabinetFeed({ notifications, memberName, avatarUrl }: Props) {
       if (!a.pinned && b.pinned) return 1;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [notifications]);
+  }, [announcements, newsItems, notifications]);
 
   const pinned  = feed.filter(f => f.pinned);
   const regular = feed.filter(f => !f.pinned);

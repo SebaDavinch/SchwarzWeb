@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getCabinetAccounts, putCabinetAccounts } from "../api/endpoints";
 
 /* ═══════════════════════════════════════════════
    TYPES
@@ -161,6 +162,22 @@ export function useAuth() {
   const [session, setSessionState] = useState<AuthSession | null>(() => loadSession());
   const [accounts, setAccountsState] = useState<Account[]>(() => loadAccounts());
 
+  // Hydrate from API on mount; if API is empty push the local seed so it persists
+  useEffect(() => {
+    void getCabinetAccounts<Account>().then((remote) => {
+      if (remote && remote.length > 0) {
+        setAccountsState(remote);
+        saveAccountsToStorage(remote);
+      } else {
+        // API is empty — push the local accounts (seeded) to the API
+        const local = loadAccounts();
+        if (local.length > 0) {
+          void putCabinetAccounts(local);
+        }
+      }
+    });
+  }, []);
+
   const setSession = (s: AuthSession | null) => {
     setSessionState(s);
     saveSessionToStorage(s);
@@ -169,6 +186,7 @@ export function useAuth() {
   const setAccounts = (a: Account[]) => {
     setAccountsState(a);
     saveAccountsToStorage(a);
+    void putCabinetAccounts(a);
   };
 
   const login = (username: string, password: string): boolean => {

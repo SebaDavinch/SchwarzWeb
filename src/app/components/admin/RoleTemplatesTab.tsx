@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Crown, Shield, Star, Award, User, Plus, Edit3, Trash2,
   Save, X, CheckCircle2, Copy, ChevronDown, ChevronUp, Lock, Unlock,
 } from "lucide-react";
+import { listRoleTemplates, putRoleTemplates, putAdminStaff } from "../../api/endpoints";
 
 /* ════════════════════════════════════════════════
    TYPES
@@ -135,9 +136,23 @@ function saveTemplates(t: RoleTemplate[]) {
 export function useRoleTemplates() {
   const [templates, setTemplatesState] = useState<RoleTemplate[]>(() => loadTemplates());
 
+  // Hydrate from API on mount; push local defaults to API if remote is empty
+  useEffect(() => {
+    void listRoleTemplates<RoleTemplate>().then((remote) => {
+      if (remote && remote.length > 0) {
+        setTemplatesState(remote);
+        saveTemplates(remote);
+      } else {
+        const local = loadTemplates();
+        void putRoleTemplates(local);
+      }
+    });
+  }, []);
+
   const persist = useCallback((t: RoleTemplate[]) => {
     setTemplatesState(t);
     saveTemplates(t);
+    void putRoleTemplates(t);
   }, []);
 
   const addTemplate = (data: Omit<RoleTemplate, "id" | "createdAt" | "isSystem">) => {
@@ -330,6 +345,7 @@ function ApplyModal({ template, onClose }: { template: RoleTemplate; onClose: ()
       const allStaff: { id: string; permissions: string[] }[] = raw ? JSON.parse(raw) : [];
       const updated = allStaff.map((s) => selected.includes(s.id) ? { ...s, permissions: [...template.permissions] } : s);
       localStorage.setItem("schwarz_admin_staff", JSON.stringify(updated));
+      void putAdminStaff(updated);
     } catch { /* ignore */ }
     setApplied(true);
     setTimeout(onClose, 1500);

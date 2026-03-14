@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router";
 import { useAdminDataWritable, useApplications, addAuditLog, type AuditLogEntry } from "../hooks/useAdminData";
+import { getAdminSnapshot, putAdminSnapshot, getAdminStaff, putAdminStaff } from "../api/endpoints";
 import { NavbarEditor } from "../components/admin/NavbarEditor";
 import { PagesEditor } from "../components/admin/PagesEditor";
 import { ApplicationsTab } from "../components/admin/ApplicationsTab";
@@ -190,13 +191,13 @@ interface StaffMember {
   position: string;
   permissions: string[];
   active: boolean;
+  login?: string;
+  password?: string;
 }
 
 /* ═══════════════════════════════════════════════
    INITIAL DATA
    ═══════════════════════════════════════════════ */
-
-const ADMIN_PASSWORD = "schwarz2026";
 
 const defaultMembers: Member[] = [
   { id: "1", name: "Madara Schwarz", role: "owner", joinDate: "2024-01-01", active: true, badges: ["streamer", "fib", "leader"] },
@@ -277,10 +278,10 @@ const permissionLabels: Record<string, string> = {
 };
 
 const defaultStaff: StaffMember[] = [
-  { id: "1", name: "Madara Schwarz", position: "Owner", permissions: [...allPermissions], active: true },
-  { id: "2", name: "Akihiro Schwarz", position: "Dep. Owner", permissions: ["manage_members", "manage_leaderships", "manage_announcements", "view_admin"], active: true },
-  { id: "3", name: "Roman Schwarz", position: "Dep. Owner", permissions: ["manage_members", "manage_leaderships", "manage_announcements", "view_admin"], active: true },
-  { id: "4", name: "Sebastian Schwarz", position: "Web Developer", permissions: ["manage_settings", "manage_media", "view_admin"], active: true },
+  { id: "1", name: "Madara Schwarz",    position: "Owner",         permissions: [...allPermissions], active: true, login: "madara",  password: "schwarz2026" },
+  { id: "2", name: "Akihiro Schwarz",   position: "Dep. Owner",   permissions: ["manage_members", "manage_leaderships", "manage_announcements", "view_admin"], active: true, login: "akihiro", password: "schwarz2026" },
+  { id: "3", name: "Roman Schwarz",     position: "Dep. Owner",   permissions: ["manage_members", "manage_leaderships", "manage_announcements", "view_admin"], active: true, login: "roman",   password: "schwarz2026" },
+  { id: "4", name: "Sebastian Schwarz", position: "Web Developer", permissions: ["manage_settings", "manage_media", "view_admin"], active: true, login: "seba", password: "schwarz2026" },
 ];
 
 /* ═══════════════════════════════════════════════
@@ -378,28 +379,44 @@ function generateId() {
    LOGIN SCREEN
    ═══════════════════════════════════════════════ */
 
-function LoginScreen({ onLogin }: { onLogin: () => void }) {
+function LoginScreen({
+  staff,
+  onLogin,
+}: {
+  staff: StaffMember[];
+  onLogin: (staffId: string) => void;
+}) {
+  const [login, setLogin]       = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState(false);
-  const [shake, setShake] = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const [shake, setShake]       = useState(false);
+
+  const triggerError = (msg: string) => {
+    setError(msg);
+    setShake(true);
+    setTimeout(() => setShake(false), 600);
+    setTimeout(() => setError(null), 3500);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      sessionStorage.setItem("schwarz_admin_auth", "1");
-      onLogin();
+    if (!login.trim()) { triggerError("Введите логин"); return; }
+    const found = staff.find(
+      (s) => s.active && s.login === login.trim() && s.password === password
+    );
+    if (found) {
+      onLogin(found.id);
     } else {
-      setError(true);
-      setShake(true);
-      setTimeout(() => setShake(false), 600);
-      setTimeout(() => setError(false), 3000);
+      triggerError("Неверный логин или пароль");
     }
   };
 
+  const inputClass =
+    "w-full bg-[#0d0d15] border border-white/8 focus:border-[#9b2335]/30 text-white/80 font-['Oswald'] tracking-wide px-4 py-3 outline-none transition-colors duration-300";
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center px-4">
-      {/* Background effects */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#9b2335]/3 blur-[200px] rounded-full pointer-events-none" />
 
       <motion.div
@@ -424,14 +441,14 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
           </p>
         </div>
 
-        {/* Login card */}
+        {/* Card */}
         <motion.div
-          animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
+          animate={shake ? { x: [-10, 10, -8, 8, 0] } : {}}
           transition={{ duration: 0.4 }}
           className="border border-white/8 bg-white/[0.02] p-8"
         >
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center border border-[#9b2335]/15 bg-[#9b2335]/5">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center border border-[#9b2335]/15 bg-[#9b2335]/5 shrink-0">
               <Lock size={18} className="text-[#9b2335]/50" strokeWidth={1.5} />
             </div>
             <div>
@@ -439,29 +456,52 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
                 Авторизация
               </p>
               <p className="font-['Oswald'] text-white/20 tracking-wide" style={{ fontSize: "0.7rem" }}>
-                Введите пароль администратора
+                Войдите в свой аккаунт
               </p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="relative mb-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Login */}
+            <div>
+              <label className="font-['Oswald'] text-white/25 uppercase tracking-wider block mb-1.5" style={{ fontSize: "0.6rem" }}>
+                Логин
+              </label>
               <input
-                type={showPass ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Пароль"
-                className="w-full bg-[#0d0d15] border border-white/8 focus:border-[#9b2335]/30 text-white/80 font-['Oswald'] tracking-wide px-4 py-3 pr-12 outline-none transition-colors duration-300"
+                type="text"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                placeholder="madara"
+                className={inputClass}
                 style={{ fontSize: "0.85rem" }}
                 autoFocus
+                autoComplete="username"
               />
-              <button
-                type="button"
-                onClick={() => setShowPass(!showPass)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/40 transition-colors"
-              >
-                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="font-['Oswald'] text-white/25 uppercase tracking-wider block mb-1.5" style={{ fontSize: "0.6rem" }}>
+                Пароль
+              </label>
+              <div className="relative">
+                <input
+                  type={showPass ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className={`${inputClass} pr-12`}
+                  style={{ fontSize: "0.85rem" }}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(!showPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/40 transition-colors"
+                >
+                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <AnimatePresence>
@@ -470,17 +510,17 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="font-['Oswald'] text-[#ff3366]/60 tracking-wide mb-4"
+                  className="font-['Oswald'] text-[#ff3366]/70 tracking-wide !mt-2"
                   style={{ fontSize: "0.75rem" }}
                 >
-                  Неверный пароль
+                  ✕ {error}
                 </motion.p>
               )}
             </AnimatePresence>
 
             <button
               type="submit"
-              className="w-full font-['Oswald'] uppercase tracking-[0.2em] text-white bg-[#9b2335] hover:bg-[#b52a40] py-3 transition-all duration-300 hover:shadow-[0_0_30px_rgba(155,35,53,0.2)]"
+              className="w-full font-['Oswald'] uppercase tracking-[0.2em] text-white bg-[#9b2335] hover:bg-[#b52a40] py-3 transition-all duration-300 hover:shadow-[0_0_30px_rgba(155,35,53,0.2)] !mt-6"
               style={{ fontSize: "0.8rem" }}
             >
               Войти
@@ -1847,9 +1887,9 @@ function RulesStaffTab({
   /* ── Staff CRUD ── */
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [editStaffId, setEditStaffId] = useState<string | null>(null);
-  const [staffForm, setStaffForm] = useState({ name: "", position: "", permissions: [] as string[] });
+  const [staffForm, setStaffForm] = useState({ name: "", position: "", login: "", password: "", permissions: [] as string[] });
 
-  const resetStaffForm = () => setStaffForm({ name: "", position: "", permissions: [] });
+  const resetStaffForm = () => setStaffForm({ name: "", position: "", login: "", password: "", permissions: [] });
 
   const handleAddStaff = () => {
     if (!staffForm.name.trim()) return;
@@ -1860,7 +1900,7 @@ function RulesStaffTab({
 
   const startEditStaff = (s: StaffMember) => {
     setEditStaffId(s.id);
-    setStaffForm({ name: s.name, position: s.position, permissions: [...s.permissions] });
+    setStaffForm({ name: s.name, position: s.position, login: s.login ?? "", password: s.password ?? "", permissions: [...s.permissions] });
   };
 
   const saveEditStaff = () => {
@@ -2203,6 +2243,32 @@ function RulesStaffTab({
                         value={staffForm.position}
                         onChange={(e) => setStaffForm({ ...staffForm, position: e.target.value })}
                         placeholder="Модератор"
+                        className="w-full bg-[#0d0d15] border border-white/8 focus:border-[#9b2335]/30 text-white/80 font-['Oswald'] tracking-wide px-3 py-2 outline-none transition-colors"
+                        style={{ fontSize: "0.85rem" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="font-['Oswald'] text-white/30 uppercase tracking-wider block mb-2" style={{ fontSize: "0.6rem" }}>
+                        Логин (для входа в /admin)
+                      </label>
+                      <input
+                        value={staffForm.login}
+                        onChange={(e) => setStaffForm({ ...staffForm, login: e.target.value })}
+                        placeholder="madara"
+                        autoComplete="off"
+                        className="w-full bg-[#0d0d15] border border-white/8 focus:border-[#9b2335]/30 text-white/80 font-['Oswald'] tracking-wide px-3 py-2 outline-none transition-colors"
+                        style={{ fontSize: "0.85rem" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="font-['Oswald'] text-white/30 uppercase tracking-wider block mb-2" style={{ fontSize: "0.6rem" }}>
+                        Пароль (для входа в /admin)
+                      </label>
+                      <input
+                        value={staffForm.password}
+                        onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+                        placeholder="••••••••"
+                        autoComplete="new-password"
                         className="w-full bg-[#0d0d15] border border-white/8 focus:border-[#9b2335]/30 text-white/80 font-['Oswald'] tracking-wide px-3 py-2 outline-none transition-colors"
                         style={{ fontSize: "0.85rem" }}
                       />
@@ -2719,31 +2785,81 @@ export function AdminPage() {
   const setMembers = (m: Member[]) => {
     setMembersState(m);
     saveState("members", m);
+    void putAdminSnapshot({ members: m as unknown[] });
   };
   const setLeaderships = (l: Leadership[]) => {
     setLeadershipsState(l);
     saveState("leaderships", l);
+    void putAdminSnapshot({ leaderships: l as unknown[] });
   };
   const setAnnouncements = (a: Announcement[]) => {
     setAnnouncementsState(a);
     saveState("announcements", a);
+    void putAdminSnapshot({ announcements: a as unknown[] });
   };
   const setRules = (r: Rule[]) => {
     setRulesState(r);
     saveState("rules", r);
+    void putAdminSnapshot({ rules: r as unknown[] });
   };
   const setPrinciples = (p: Principle[]) => {
     setPrinciplesState(p);
     saveState("principles", p);
+    void putAdminSnapshot({ principles: p as unknown[] });
   };
   const setStaff = (s: StaffMember[]) => {
     setStaffState(s);
     saveState("staff", s);
+    void putAdminStaff(s);
   };
+
+  // On mount: hydrate all state from the API server (overrides stale localStorage)
+  useEffect(() => {
+    void getAdminSnapshot().then((snapshot) => {
+      if (!snapshot) return;
+      if (Array.isArray(snapshot.members) && snapshot.members.length > 0) {
+        const m = snapshot.members as Member[];
+        setMembersState(m);
+        saveState("members", m);
+      }
+      if (Array.isArray(snapshot.leaderships) && snapshot.leaderships.length > 0) {
+        const l = snapshot.leaderships as Leadership[];
+        setLeadershipsState(l);
+        saveState("leaderships", l);
+      }
+      if (Array.isArray(snapshot.announcements) && snapshot.announcements.length > 0) {
+        const a = snapshot.announcements as Announcement[];
+        setAnnouncementsState(a);
+        saveState("announcements", a);
+      }
+      if (Array.isArray(snapshot.rules) && snapshot.rules.length > 0) {
+        const r = snapshot.rules as Rule[];
+        setRulesState(r);
+        saveState("rules", r);
+      }
+      if (Array.isArray(snapshot.principles) && snapshot.principles.length > 0) {
+        const p = snapshot.principles as Principle[];
+        setPrinciplesState(p);
+        saveState("principles", p);
+      }
+    });
+    void getAdminStaff<StaffMember>().then((remoteStaff) => {
+      if (!remoteStaff || remoteStaff.length === 0) return;
+      setStaffState(remoteStaff);
+      saveState("staff", remoteStaff);
+    });
+  }, []);
 
   // Pages & Navbar writable data
   const adminData = useAdminDataWritable();
   const { pendingCount: pendingApps } = useApplications();
+
+  const handleLogin = (staffId: string) => {
+    sessionStorage.setItem("schwarz_admin_auth", "1");
+    sessionStorage.setItem("schwarz_admin_staff_id", staffId);
+    setAuthed(true);
+    setCurrentStaffId(staffId);
+  };
 
   const handleLogout = () => {
     sessionStorage.removeItem("schwarz_admin_auth");
@@ -2759,22 +2875,13 @@ export function AdminPage() {
         .map(([tab]) => tab as Tab))
     : undefined;
 
-  const handleSelectStaff = (id: string) => {
-    sessionStorage.setItem("schwarz_admin_staff_id", id);
-    setCurrentStaffId(id);
-  };
-
   const handleTabChange = (tab: Tab) => {
     if (allowedTabs && !allowedTabs.includes(tab)) return;
     setActiveTab(tab);
   };
 
-  if (!authed) {
-    return <LoginScreen onLogin={() => setAuthed(true)} />;
-  }
-
-  if (!currentStaffId || !currentStaff) {
-    return <StaffSelector staff={staffMembers} onSelect={handleSelectStaff} onBack={handleLogout} />;
+  if (!authed || !currentStaffId || !currentStaff) {
+    return <LoginScreen staff={staffMembers} onLogin={handleLogin} />;
   }
 
   return (

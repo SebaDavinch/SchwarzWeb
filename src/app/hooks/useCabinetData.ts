@@ -515,6 +515,39 @@ export function useCabinetData() {
     fetch("/api/infrastructure").then(r => r.json())
       .then((d: InfrastructureItem[]) => setInfrastructureState(Array.isArray(d) && d.length ? d : defaultInfrastructure))
       .catch(() => setInfrastructureState(defaultInfrastructure));
+    // Notifications from admin (/api/notifications stores AdminNotification[], map to CabinetNotification)
+    fetch("/api/notifications").then(r => r.json())
+      .then((d: { id: string; title: string; text: string; type: string; createdAt: string }[]) => {
+        if (Array.isArray(d) && d.length > 0) {
+          const mapped: CabinetNotification[] = d.map(n => ({
+            id: `admin_notif_${n.id}`,
+            title: n.title,
+            text: n.text,
+            type: n.type as CabinetNotification["type"],
+            createdAt: n.createdAt,
+          }));
+          setNotificationsState(mapped);
+          saveData("cabinet_notifications", mapped);
+        }
+      }).catch(() => {});
+    // Achievement defs — push local defaults if server is empty
+    fetch("/api/achievement-defs").then(r => r.json())
+      .then((d: AchievementDef[]) => {
+        if (Array.isArray(d) && d.length > 0) {
+          setAchievementDefsState(d);
+          saveData("achievement_defs", d);
+        } else {
+          apiPut("/api/achievement-defs", defaultAchievements);
+        }
+      }).catch(() => {});
+    // User achievements
+    fetch("/api/user-achievements").then(r => r.json())
+      .then((d: UserAchievement[]) => {
+        if (Array.isArray(d) && d.length > 0) {
+          setUserAchievementsState(d);
+          saveData("user_achievements", d);
+        }
+      }).catch(() => {});
   }, []);
 
   /* --- Vehicles --- */
@@ -625,6 +658,7 @@ export function useCabinetData() {
       const updatedUAs = [...currentUAs, ...newUAs];
       setUserAchievementsState(updatedUAs);
       saveData("user_achievements", updatedUAs);
+      apiPut("/api/user-achievements", updatedUAs);
     }
   };
 
@@ -666,6 +700,7 @@ export function useCabinetData() {
   const setAchievementDefs = (a: AchievementDef[]) => {
     setAchievementDefsState(a);
     saveData("achievement_defs", a);
+    apiPut("/api/achievement-defs", a);
   };
   const awardAchievement = (memberId: string, achievementId: string) => {
     if (
@@ -680,6 +715,7 @@ export function useCabinetData() {
     ];
     setUserAchievementsState(updated);
     saveData("user_achievements", updated);
+    apiPut("/api/user-achievements", updated);
   };
   const getMemberAchievements = (memberId: string) =>
     userAchievements.filter((ua) => ua.memberId === memberId);

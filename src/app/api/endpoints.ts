@@ -150,6 +150,19 @@ export async function deleteAdminAccount(id: string) {
   return requestVoid(`/auth/accounts/${id}`, { method: "DELETE" });
 }
 
+/* ─── Admin Staff (login credentials) ─── */
+
+export async function getAdminStaff<T>() {
+  return requestJson<T[]>("/admin/staff", { method: "GET" });
+}
+
+export async function putAdminStaff<T>(payload: T[]) {
+  return requestVoid("/admin/staff", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 /* ─── News Articles ─── */
 
 export async function listNews<T>() {
@@ -333,6 +346,33 @@ export async function getBirthdayNotifConfigAPI<T>() {
 }
 export async function putBirthdayNotifConfigAPI<T>(payload: T) {
   return requestVoid("/birthdays/notif-config", { method: "PUT", body: JSON.stringify(payload) });
+}
+
+/* ─── Cabinet Accounts (member ЛК) ─── */
+
+export async function getCabinetAccounts<T>() {
+  return requestJson<T[]>("/cabinet/accounts", { method: "GET" });
+}
+export async function putCabinetAccounts<T>(payload: T[]) {
+  return requestVoid("/cabinet/accounts", { method: "PUT", body: JSON.stringify(payload) });
+}
+
+/* ─── Role Templates ─── */
+
+export async function listRoleTemplates<T>() {
+  return requestJson<T[]>("/role-templates", { method: "GET" });
+}
+export async function putRoleTemplates<T>(payload: T[]) {
+  return requestVoid("/role-templates", { method: "PUT", body: JSON.stringify(payload) });
+}
+
+/* ─── Admin Notifications ─── */
+
+export async function getAdminNotifications<T>() {
+  return requestJson<T[]>("/notifications", { method: "GET" });
+}
+export async function putAdminNotifications<T>(payload: T[]) {
+  return requestVoid("/notifications", { method: "PUT", body: JSON.stringify(payload) });
 }
 
 /* ─── Family Goals ─── */

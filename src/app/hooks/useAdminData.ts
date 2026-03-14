@@ -376,6 +376,28 @@ export function useAdminDataWritable() {
   const [customPages, setCustomPagesState] = useState<CustomPage[]>(() => load("customPages", []));
   const [pageOverrides, setPageOverridesState] = useState<PageOverride[]>(() => load("pageOverrides", []));
 
+  // Hydrate from API so edits persist across devices/browsers
+  useEffect(() => {
+    void getAdminSnapshot().then((snapshot) => {
+      if (!snapshot) return;
+      if (Array.isArray(snapshot.navItems)) {
+        const next = snapshot.navItems as NavItem[];
+        setNavItemsState(next);
+        save("navItems", next);
+      }
+      if (Array.isArray(snapshot.customPages)) {
+        const next = snapshot.customPages as CustomPage[];
+        setCustomPagesState(next);
+        save("customPages", next);
+      }
+      if (Array.isArray(snapshot.pageOverrides)) {
+        const next = snapshot.pageOverrides as PageOverride[];
+        setPageOverridesState(next);
+        save("pageOverrides", next);
+      }
+    });
+  }, []);
+
   const setNavItems = (items: NavItem[]) => {
     setNavItemsState(items);
     save("navItems", items);

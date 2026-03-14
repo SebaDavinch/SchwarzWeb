@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Bell, Plus, Trash2, Send, Info, AlertTriangle, CheckCircle2,
   Megaphone, Users, X, Clock, ChevronDown, ChevronUp,
 } from "lucide-react";
+import { getAdminNotifications, putAdminNotifications } from "../../api/endpoints";
 
 /* ────────────────────────────────────────────
    TYPES
@@ -64,10 +65,27 @@ function genId() {
 function useAdminNotifications() {
   const [notifications, setNotifications] = useState<AdminNotification[]>(() => loadNotifications());
 
+  // Hydrate from API on mount; push local data to API if remote is empty
+  useEffect(() => {
+    void getAdminNotifications<AdminNotification>().then((remote) => {
+      if (remote && remote.length > 0) {
+        setNotifications(remote);
+        saveNotifications(remote);
+        syncToCabinetFeed(remote);
+      } else {
+        const local = loadNotifications();
+        if (local.length > 0) {
+          void putAdminNotifications(local);
+        }
+      }
+    });
+  }, []);
+
   const persist = useCallback((ns: AdminNotification[]) => {
     setNotifications(ns);
     saveNotifications(ns);
     syncToCabinetFeed(ns);
+    void putAdminNotifications(ns);
   }, []);
 
   const addNotification = (data: Omit<AdminNotification, "id" | "createdAt">) => {
