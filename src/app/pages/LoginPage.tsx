@@ -5,7 +5,7 @@ import { Eye, EyeOff, Lock, User } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
 export function LoginPage() {
-  const { login } = useAuth();
+  const { login, accountsLoaded } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -185,10 +185,11 @@ export function LoginPage() {
 
             <button
               type="submit"
-              className="w-full py-3 bg-[#9b2335] hover:bg-[#b52a40] text-white uppercase tracking-widest transition-all duration-300 mt-2"
+              disabled={!accountsLoaded}
+              className="w-full py-3 bg-[#9b2335] hover:bg-[#b52a40] disabled:opacity-40 disabled:cursor-not-allowed text-white uppercase tracking-widest transition-all duration-300 mt-2"
               style={{ fontFamily: "'Oswald', sans-serif", fontSize: "0.72rem" }}
             >
-              Войти
+              {accountsLoaded ? "Войти" : "Загрузка..."}
             </button>
           </form>
         </motion.div>

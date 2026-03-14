@@ -161,6 +161,7 @@ export function generateUsername(memberName: string): string {
 export function useAuth() {
   const [session, setSessionState] = useState<AuthSession | null>(() => loadSession());
   const [accounts, setAccountsState] = useState<Account[]>(() => loadAccounts());
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
 
   // Hydrate from API on mount; if API is empty push the local seed so it persists
   useEffect(() => {
@@ -175,7 +176,8 @@ export function useAuth() {
           void putCabinetAccounts(local);
         }
       }
-    });
+      setAccountsLoaded(true);
+    }).catch(() => setAccountsLoaded(true));
   }, []);
 
   const setSession = (s: AuthSession | null) => {
@@ -190,8 +192,8 @@ export function useAuth() {
   };
 
   const login = (username: string, password: string): boolean => {
-    const accs = loadAccounts();
-    const account = accs.find(
+    // Use React state (hydrated from API) — not localStorage — to avoid race conditions
+    const account = accounts.find(
       (a) => a.username === username && a.password === password
     );
     if (!account) return false;
@@ -242,6 +244,7 @@ export function useAuth() {
   return {
     session,
     accounts,
+    accountsLoaded,
     currentAccount,
     login,
     logout,
