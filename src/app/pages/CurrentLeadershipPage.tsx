@@ -23,23 +23,23 @@ const heroBg =
 const activities = [
   {
     icon: Gamepad2,
-    title: "РРіСЂР°РµРј РІ РґСЂСѓРіРёРµ РёРіСЂС‹",
-    desc: "РџРѕРєР° РЅРµС‚ Р°РєС‚РёРІРЅРѕР№ Р»РёРґРµСЂРєРё, С‡Р°СЃС‚СЊ СЃРѕСЃС‚Р°РІР° РёРіСЂР°РµС‚ РІ РґСЂСѓРіРёРµ РїСЂРѕРµРєС‚С‹. РќРѕ RP РЅРµ Р·Р°Р±С‹РІР°РµРј.",
+    title: "Играем в другие игры",
+    desc: "Пока нет активной лидерки, часть состава играет в другие проекты. Но RP не забываем.",
   },
   {
     icon: MessageCircle,
-    title: "Р”РёСЃРєРѕСЂРґ Р°РєС‚РёРІРµРЅ",
-    desc: "РћР±С‰РµРЅРёРµ, РїР»Р°РЅРёСЂРѕРІР°РЅРёРµ, РѕР±СЃСѓР¶РґРµРЅРёСЏ вЂ” РІСЃС‘ РІ Discord. Р—Р°С…РѕРґРё, РЅРµ СЃС‚РµСЃРЅСЏР№СЃСЏ.",
+    title: "Дискорд активен",
+    desc: "Общение, планирование, обсуждения - все в Discord. Заходи, не стесняйся.",
   },
   {
     icon: Clock,
-    title: "Р“РѕС‚РѕРІРёРјСЃСЏ Рє СЃР»РµРґСѓСЋС‰РµР№",
-    desc: "РќР°Р±РёСЂР°РµРј Р»СЋРґРµР№, РѕР±СѓС‡Р°РµРј, РїР»Р°РЅРёСЂСѓРµРј. РљРѕРіРґР° РїРѕР№РґС‘Рј РЅР° СЃР»РµРґСѓСЋС‰СѓСЋ Р»РёРґРµСЂРєСѓ вЂ” Р±СѓРґРµРј РіРѕС‚РѕРІС‹.",
+    title: "Готовимся к следующей",
+    desc: "Набираем людей, обучаем, планируем. Когда пойдем на следующую лидерку - будем готовы.",
   },
 ];
 
 function formatDate(dateStr: string) {
-  if (!dateStr) return "вЂ”";
+  if (!dateStr) return "-";
   try {
     return new Date(dateStr).toLocaleDateString("ru-RU", {
       day: "numeric", month: "long", year: "numeric",
@@ -52,22 +52,28 @@ function formatDate(dateStr: string) {
 export function CurrentLeadershipPage() {
   const { getPageOverride, activeLeadership } = useAdminData();
 
-  /* в”Ђв”Ђ fallback text overrides в”Ђв”Ђ */
-  const heroTitle = getPageOverride("current-leadership", "hero_title") ?? (activeLeadership ? activeLeadership.faction : "РЎРµР№С‡Р°СЃ вЂ” РѕС‚РґС‹С…Р°РµРј");
+  const heroTitle =
+    getPageOverride("current-leadership", "hero_title") ??
+    (activeLeadership ? activeLeadership.faction : "Сейчас - отдыхаем");
   const heroTitlePlain = heroTitle.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-  const heroDesc = getPageOverride("current-leadership", "hero_desc") ??
+  const heroDesc =
+    getPageOverride("current-leadership", "hero_desc") ??
     (activeLeadership
-      ? `Schwarz Family РґРµСЂР¶РёС‚ Р»РёРґРµСЂРєСѓ ${activeLeadership.faction} РЅР° СЃРµСЂРІРµСЂРµ ${activeLeadership.server}.`
-      : "РђРєС‚РёРІРЅРѕР№ Р»РёРґРµСЂРєРё СЃРµР№С‡Р°СЃ РЅРµС‚. РЎРµРјСЊСЏ РЅР° РїР°СѓР·Рµ вЂ” РѕС‚РґС‹С…Р°РµРј, РЅР°Р±РёСЂР°РµРјСЃСЏ СЃРёР» Рё РіРѕС‚РѕРІРёРјСЃСЏ Рє СЃР»РµРґСѓСЋС‰РµР№ РіР»Р°РІРµ.");
-  const statusLabel = getPageOverride("current-leadership", "status_label") ?? (activeLeadership ? "РђРєС‚РёРІРЅР°СЏ Р»РёРґРµСЂРєР°" : "РќР° РїР°СѓР·Рµ");
-  const activitiesTitle = getPageOverride("current-leadership", "activities_title") ?? "РњРµР¶РґСѓ Р»РёРґРµСЂРєР°РјРё";
-  const activitiesDesc = getPageOverride("current-leadership", "activities_desc") ?? "Р§РµРј Р·Р°РЅСЏС‚С‹";
+      ? `Schwarz Family держит лидерку ${activeLeadership.faction} на сервере ${activeLeadership.server}.`
+      : "Активной лидерки сейчас нет. Семья на паузе - отдыхаем, набираемся сил и готовимся к следующей главе.");
+  const statusLabel =
+    getPageOverride("current-leadership", "status_label") ??
+    (activeLeadership ? "Активная лидерка" : "На паузе");
+  const activitiesTitle =
+    getPageOverride("current-leadership", "activities_title") ?? "Между лидерками";
+  const activitiesDesc =
+    getPageOverride("current-leadership", "activities_desc") ?? "Чем заняты";
 
   const accentColor = activeLeadership?.color ?? "#f59e0b";
 
   return (
     <div className="pt-16">
-      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђ HERO в•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
+      {/* Hero */}
       <div className="relative h-[50vh] min-h-[400px] flex items-center justify-center overflow-hidden">
         <ImageWithFallback
           src={heroBg}
@@ -155,7 +161,7 @@ export function CurrentLeadershipPage() {
         </div>
       </div>
 
-      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђ ACTIVE LEADERSHIP DETAILS в•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
+      {/* Active leadership details */}
       {activeLeadership && (
         <section className="py-16 px-6">
           <div className="max-w-2xl mx-auto">
@@ -170,7 +176,7 @@ export function CurrentLeadershipPage() {
                 className="text-xs font-['Oswald'] uppercase tracking-[0.3em] mb-6"
                 style={{ color: `${accentColor}60` }}
               >
-                РўРµРєСѓС‰Р°СЏ Р»РёРґРµСЂРєР°
+                Текущая лидерка
               </div>
               <h2
                 className="font-['Russo_One'] text-white mb-8"
@@ -180,10 +186,10 @@ export function CurrentLeadershipPage() {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
-                  { icon: MapPin, label: "РЎРµСЂРІРµСЂ", value: activeLeadership.server },
-                  { icon: User, label: "Р›РёРґРµСЂ", value: activeLeadership.leader },
-                  { icon: Calendar, label: "РќР°С‡Р°Р»Рѕ", value: formatDate(activeLeadership.startDate) },
-                  { icon: Calendar, label: "РљРѕРЅРµС†", value: activeLeadership.endDate ? formatDate(activeLeadership.endDate) : "Р’ РїСЂРѕС†РµСЃСЃРµ" },
+                  { icon: MapPin, label: "Сервер", value: activeLeadership.server },
+                  { icon: User, label: "Лидер", value: activeLeadership.leader },
+                  { icon: Calendar, label: "Начало", value: formatDate(activeLeadership.startDate) },
+                  { icon: Calendar, label: "Конец", value: activeLeadership.endDate ? formatDate(activeLeadership.endDate) : "В процессе" },
                 ].map(({ icon: Icon, label, value }) => (
                   <div
                     key={label}
@@ -212,7 +218,7 @@ export function CurrentLeadershipPage() {
         </section>
       )}
 
-      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђ WHAT WE'RE DOING (only when no active) в•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
+      {/* What we're doing when there is no active leadership */}
       {!activeLeadership && (
         <section className="py-20 px-6">
           <div className="max-w-3xl mx-auto">
@@ -278,7 +284,7 @@ export function CurrentLeadershipPage() {
         </section>
       )}
 
-      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђ HISTORY LINK в•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
+      {/* History link */}
       <section className="py-16 px-6">
         <div className="max-w-2xl mx-auto">
           <motion.div
@@ -292,22 +298,22 @@ export function CurrentLeadershipPage() {
               className="font-['Oswald'] text-white/40 tracking-wide mb-4"
               style={{ fontSize: "0.95rem", lineHeight: 1.8 }}
             >
-              РҐРѕС‡РµС€СЊ СѓР·РЅР°С‚СЊ, С‡РµРј РјС‹ Р·Р°РЅРёРјР°Р»РёСЃСЊ РґРѕ СЌС‚РѕРіРѕ?
+              Хочешь узнать, чем мы занимались до этого?
               <br />
-              15+ СЃСЂРѕРєРѕРІ Р»РёРґРµСЂСЃС‚РІР° РІ LSPD, FIB, LSSD Рё Yakuza.
+              15+ сроков лидерства в LSPD, FIB, LSSD и Yakuza.
             </p>
             <Link
               to="/history"
               className="inline-flex items-center gap-2 font-['Oswald'] uppercase tracking-[0.2em] text-[#9b2335]/70 hover:text-[#9b2335] border border-[#9b2335]/20 hover:border-[#9b2335]/40 px-6 py-2.5 transition-all duration-300"
               style={{ fontSize: "0.75rem" }}
             >
-              РџРѕСЃРјРѕС‚СЂРµС‚СЊ РёСЃС‚РѕСЂРёСЋ
+              Посмотреть историю
             </Link>
           </motion.div>
         </div>
       </section>
 
-      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђ BOTTOM в•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
+      {/* Bottom quote */}
       {!activeLeadership && (
         <section className="py-20 px-6">
           <motion.div
@@ -323,15 +329,15 @@ export function CurrentLeadershipPage() {
               className="font-['Russo_One'] text-white/40"
               style={{ fontSize: "1.15rem", lineHeight: 1.6 }}
             >
-              В«Р”Р°Р¶Рµ РЅР° РѕС‚РґС‹С…Рµ вЂ”
+              "Даже на отдыхе -
               <br />
-              РјС‹ РѕСЃС‚Р°С‘РјСЃСЏ SchwarzВ»
+              мы остаемся Schwarz"
             </p>
             <p
               className="font-['Oswald'] text-white/15 uppercase tracking-[0.3em] mt-5"
               style={{ fontSize: "0.7rem" }}
             >
-              вЂ” Schwarz Family, 2026
+              - Schwarz Family, 2026
             </p>
             <div className="w-12 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent mx-auto mt-8" />
           </motion.div>
