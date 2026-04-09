@@ -54,6 +54,17 @@ export interface PageOverride {
   sections: Record<string, string>;
 }
 
+export interface Leadership {
+  id: string;
+  faction: string;
+  server: string;
+  leader: string;
+  startDate: string;
+  endDate: string;
+  status: "active" | "completed" | "planned";
+  color: string;
+}
+
 export interface AdminMember {
   id: string;
   name: string;
@@ -294,6 +305,7 @@ export function useAdminData() {
   const [customPages, setCustomPages] = useState<CustomPage[]>(() => load("customPages", []));
   const [pageOverrides, setPageOverrides] = useState<PageOverride[]>(() => load("pageOverrides", []));
   const [members, setMembers] = useState<AdminMember[]>(() => load("members", []));
+  const [leaderships, setLeaderships] = useState<Leadership[]>(() => load("leaderships", []));
 
   // Listen for storage changes (cross-tab sync)
   useEffect(() => {
@@ -304,8 +316,7 @@ export function useAdminData() {
       if (k === "announcements") setAnnouncements(load("announcements", []));
       if (k === "customPages") setCustomPages(load("customPages", []));
       if (k === "pageOverrides") setPageOverrides(load("pageOverrides", []));
-      if (k === "members") setMembers(load("members", []));
-    };
+      if (k === "members") setMembers(load("members", []));      if (k === "leaderships") setLeaderships(load("leaderships", []));    };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
   }, []);
@@ -339,6 +350,11 @@ export function useAdminData() {
         setMembers(next);
         save("members", next);
       }
+      if (Array.isArray(snapshot.leaderships)) {
+        const next = snapshot.leaderships as Leadership[];
+        setLeaderships(next);
+        save("leaderships", next);
+      }
     });
   }, []);
 
@@ -353,6 +369,7 @@ export function useAdminData() {
   const visibleNavItems = navItems.filter((n) => n.visible);
   const pinnedAnnouncements = announcements.filter((a) => a.pinned);
   const visibleCustomPages = customPages.filter((p) => p.visible);
+  const activeLeadership = leaderships.find((l) => l.status === "active") ?? null;
 
   return {
     navItems,
@@ -364,6 +381,8 @@ export function useAdminData() {
     pageOverrides,
     getPageOverride,
     members,
+    leaderships,
+    activeLeadership,
   };
 }
 
