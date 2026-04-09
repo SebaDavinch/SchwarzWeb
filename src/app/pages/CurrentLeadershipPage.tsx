@@ -10,6 +10,10 @@ import {
   MapPin,
   User,
   Calendar,
+  ArrowRight,
+  FileText,
+  Shield,
+  Users,
 } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { Link } from "react-router";
@@ -47,6 +51,48 @@ const activities = [
     icon: Clock,
     title: "Готовимся к следующей",
     desc: "Набираем людей, обучаем, планируем. Когда пойдем на следующую лидерку - будем готовы.",
+  },
+];
+
+const projectHighlights = [
+  {
+    icon: Trophy,
+    title: "Про лидерки, а не про массовку",
+    desc: "Schwarz Family собирает людей под серьёзный faction RP: сроки, структура, ответственность и общий темп без хаоса.",
+  },
+  {
+    icon: Users,
+    title: "Командная игра и внутренняя дисциплина",
+    desc: "Важно уметь держать слово, быть на связи и встраиваться в общий стиль семьи, а не играть в соло-режим.",
+  },
+  {
+    icon: Shield,
+    title: "Адекватность важнее шума",
+    desc: "Мы смотрим на поведение, общение и отношение к людям. Конфликтность, токсичность и нестабильность здесь не заходят.",
+  },
+];
+
+const joinSteps = [
+  {
+    step: "01",
+    title: "Пойми наш формат",
+    desc: "Сначала посмотри, как мы играем и чего ждём от состава. Это отсеивает случайных людей ещё до заявки.",
+    href: "/how-to-play",
+    cta: "Как мы играем",
+  },
+  {
+    step: "02",
+    title: "Выйди на контакт",
+    desc: "Если хочешь зайти через текущую лидерку, лучше заранее написать и познакомиться, чтобы мы понимали твой прайм и мотивацию.",
+    href: "/contacts",
+    cta: "Контакты семьи",
+  },
+  {
+    step: "03",
+    title: "Подай заявку",
+    desc: "После этого отправляй анкету. Дальше идёт проверка, обратная связь в Discord и, если всё ок, испытательный период.",
+    href: "/join",
+    cta: "Анкета на вступление",
   },
 ];
 
@@ -218,6 +264,16 @@ function getLeadershipHeroPreset(faction?: string | null) {
   return leadershipHeroPresets.find((preset) => preset.match.test(faction)) ?? defaultLeadershipPreset;
 }
 
+function splitHeroDescription(desc: string) {
+  const [firstSentence, ...rest] = desc.split(". ");
+  if (!firstSentence || rest.length === 0) return null;
+
+  const secondSentence = rest.join(". ").trim();
+  if (!secondSentence) return null;
+
+  return [`${firstSentence.trim()}.`, secondSentence] as const;
+}
+
 export function CurrentLeadershipPage() {
   const { getPageOverride, activeLeadership } = useAdminData();
   const heroPreset = getLeadershipHeroPreset(activeLeadership?.faction);
@@ -226,11 +282,13 @@ export function CurrentLeadershipPage() {
     getPageOverride("current-leadership", "hero_title") ??
     (activeLeadership ? activeLeadership.faction : "Сейчас - отдыхаем");
   const heroTitlePlain = heroTitle.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const heroDescOverride = getPageOverride("current-leadership", "hero_desc");
   const heroDesc =
-    getPageOverride("current-leadership", "hero_desc") ??
+    heroDescOverride ??
     (activeLeadership
       ? heroPreset.description(activeLeadership)
       : "Активной лидерки сейчас нет. Семья на паузе - отдыхаем, набираемся сил и готовимся к следующей главе.");
+  const heroDescLines = !heroDescOverride && activeLeadership ? splitHeroDescription(heroDesc) : null;
   const statusLabel =
     getPageOverride("current-leadership", "status_label") ??
     (activeLeadership ? "Активная лидерка" : "На паузе");
@@ -251,13 +309,13 @@ export function CurrentLeadershipPage() {
           alt={activeLeadership ? heroPreset.alt : "Vacation"}
           className={`absolute inset-0 w-full h-full object-cover ${activeLeadership ? heroPreset.imageClassName : "object-center opacity-15"}`}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f] via-[#0a0a0f]/40 to-[#0a0a0f]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0f]/80 via-[#0a0a0f]/25 to-[#0a0a0f]/80" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f]/88 via-[#0a0a0f]/28 to-[#0a0a0f]/92" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0f]/62 via-[#0a0a0f]/12 to-[#0a0a0f]/62" />
         {activeLeadership && (
           <div
             className="absolute inset-0"
             style={{
-              background: `linear-gradient(135deg, ${accentColor}1a 0%, transparent 30%, transparent 70%, ${accentColor}14 100%)`,
+              background: `linear-gradient(135deg, ${accentColor}12 0%, transparent 28%, transparent 72%, ${accentColor}0f 100%)`,
             }}
           />
         )}
@@ -321,20 +379,32 @@ export function CurrentLeadershipPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.5 }}
-            className="mt-5 text-white/30 font-['Oswald'] tracking-wide max-w-lg mx-auto"
-            style={{ fontSize: "1.025rem", lineHeight: 1.7 }}
-            dangerouslySetInnerHTML={{ __html: heroDesc }}
-          />
+            className="mt-5 text-white/30 font-['Oswald'] tracking-wide mx-auto"
+            style={{
+              fontSize: "1.025rem",
+              lineHeight: 1.7,
+              maxWidth: heroDescLines ? "58rem" : "32rem",
+            }}
+          >
+            {heroDescLines ? (
+              <>
+                <span className="block text-balance">{heroDescLines[0]}</span>
+                <span className="block text-balance">{heroDescLines[1]}</span>
+              </>
+            ) : (
+              <span dangerouslySetInnerHTML={{ __html: heroDesc }} />
+            )}
+          </motion.p>
 
           {/* Status badge */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.7, duration: 0.4 }}
-            className="mt-8 inline-flex items-center gap-2 px-4 py-2"
+            className="mt-8 inline-flex items-center gap-2 px-4 py-2 backdrop-blur-sm"
             style={{
               border: `1px solid ${accentColor}33`,
-              background: `${accentColor}0d`,
+              background: `${accentColor}08`,
             }}
           >
             {activeLeadership ? (
@@ -363,7 +433,7 @@ export function CurrentLeadershipPage() {
               {heroPreset.chips.map((item) => (
                 <span
                   key={item.label}
-                  className="px-3 py-1 border bg-white/[0.04] backdrop-blur-sm font-['Oswald'] uppercase tracking-[0.2em]"
+                  className="px-3 py-1 border bg-white/[0.025] backdrop-blur-sm font-['Oswald'] uppercase tracking-[0.2em]"
                   style={{
                     fontSize: "0.62rem",
                     color: item.tone,
@@ -386,7 +456,7 @@ export function CurrentLeadershipPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="border bg-white/[0.015] p-8"
+              className="border bg-white/[0.01] backdrop-blur-[2px] p-8"
               style={{ borderColor: `${accentColor}22` }}
             >
               <div
@@ -410,7 +480,7 @@ export function CurrentLeadershipPage() {
                 ].map(({ icon: Icon, label, value }) => (
                   <div
                     key={label}
-                    className="flex items-start gap-3 p-4 border border-white/[0.04] bg-white/[0.01]"
+                    className="flex items-start gap-3 p-4 border border-white/[0.04] bg-white/[0.006]"
                   >
                     <Icon size={14} className="text-white/20 mt-0.5 shrink-0" />
                     <div>
@@ -469,7 +539,7 @@ export function CurrentLeadershipPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1, duration: 0.5 }}
-                  className="group flex gap-5 border border-white/5 bg-white/[0.01] p-6 hover:border-[#9b2335]/15 transition-all duration-500"
+                  className="group flex gap-5 border border-white/5 bg-white/[0.006] p-6 hover:border-[#9b2335]/15 transition-all duration-500"
                 >
                   <div
                     className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-0.5"
@@ -501,6 +571,157 @@ export function CurrentLeadershipPage() {
         </section>
       )}
 
+      <section className="py-16 px-6">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="mb-10 text-center"
+          >
+            <span
+              className="font-['Oswald'] uppercase tracking-[0.3em]"
+              style={{ fontSize: "0.68rem", color: `${accentColor}80` }}
+            >
+              Для новых людей
+            </span>
+            <h2
+              className="mt-4 font-['Russo_One'] text-white"
+              style={{ fontSize: "clamp(1.45rem, 3vw, 2.2rem)", lineHeight: 1.15 }}
+            >
+              Что это за проект и как зайти в состав
+            </h2>
+            <p
+              className="mt-4 max-w-2xl mx-auto font-['Oswald'] text-white/35 tracking-wide"
+              style={{ fontSize: "0.94rem", lineHeight: 1.85 }}
+            >
+              Если ты попал на страницу текущей лидерки впервые: ниже коротко собран смысл проекта, чего мы ждём от людей и какой путь входа самый нормальный.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6 items-start">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="border bg-white/[0.012] backdrop-blur-[2px] p-7 md:p-8"
+              style={{ borderColor: `${accentColor}22` }}
+            >
+              <div
+                className="inline-flex items-center gap-2 px-3 py-1.5 border mb-6"
+                style={{ borderColor: `${accentColor}2e`, background: `${accentColor}08` }}
+              >
+                <FileText size={14} style={{ color: `${accentColor}b3` }} />
+                <span
+                  className="font-['Oswald'] uppercase tracking-[0.25em]"
+                  style={{ fontSize: "0.62rem", color: `${accentColor}b3` }}
+                >
+                  Кратко о проекте
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {projectHighlights.map(({ icon: Icon, title, desc }) => (
+                  <div
+                    key={title}
+                    className="border border-white/[0.05] bg-white/[0.008] p-5"
+                  >
+                    <div
+                      className="w-10 h-10 mb-4 rounded-full flex items-center justify-center"
+                      style={{ background: `${accentColor}12`, border: `1px solid ${accentColor}22` }}
+                    >
+                      <Icon size={16} style={{ color: `${accentColor}cc` }} />
+                    </div>
+                    <h3
+                      className="font-['Oswald'] uppercase tracking-[0.14em] text-white mb-2"
+                      style={{ fontSize: "0.8rem" }}
+                    >
+                      {title}
+                    </h3>
+                    <p
+                      className="font-['Oswald'] text-white/35 tracking-wide"
+                      style={{ fontSize: "0.82rem", lineHeight: 1.75 }}
+                    >
+                      {desc}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.55 }}
+              className="border bg-white/[0.01] backdrop-blur-[2px] p-7 md:p-8"
+              style={{ borderColor: `${accentColor}22` }}
+            >
+              <div
+                className="font-['Oswald'] uppercase tracking-[0.3em] mb-6"
+                style={{ fontSize: "0.65rem", color: `${accentColor}70` }}
+              >
+                Как вступить
+              </div>
+
+              <div className="space-y-4">
+                {joinSteps.map((item) => (
+                  <div
+                    key={item.step}
+                    className="border border-white/[0.05] bg-white/[0.006] p-5"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className="shrink-0 font-['Russo_One']"
+                        style={{ fontSize: "1rem", color: `${accentColor}cc` }}
+                      >
+                        {item.step}
+                      </div>
+                      <div className="min-w-0">
+                        <h3
+                          className="font-['Oswald'] uppercase tracking-[0.18em] text-white mb-2"
+                          style={{ fontSize: "0.78rem" }}
+                        >
+                          {item.title}
+                        </h3>
+                        <p
+                          className="font-['Oswald'] text-white/35 tracking-wide"
+                          style={{ fontSize: "0.82rem", lineHeight: 1.75 }}
+                        >
+                          {item.desc}
+                        </p>
+                        <Link
+                          to={item.href}
+                          className="mt-3 inline-flex items-center gap-2 font-['Oswald'] uppercase tracking-[0.18em] transition-colors"
+                          style={{ fontSize: "0.68rem", color: `${accentColor}b3` }}
+                        >
+                          {item.cta}
+                          <ArrowRight size={13} />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div
+                className="mt-6 border p-5"
+                style={{ borderColor: `${accentColor}1f`, background: `${accentColor}05` }}
+              >
+                <p
+                  className="font-['Oswald'] text-white/45 tracking-wide"
+                  style={{ fontSize: "0.8rem", lineHeight: 1.8 }}
+                >
+                  Быстрый ориентир: сначала смотри формат, потом знакомься с людьми, и только после этого отправляй заявку. Так шанс зайти в состав заметно выше, чем через сухую анкету без контекста.
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
       {/* History link */}
       <section className="py-16 px-6">
         <div className="max-w-2xl mx-auto">
@@ -509,7 +730,7 @@ export function CurrentLeadershipPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="border border-white/5 bg-white/[0.02] p-8 text-center"
+            className="border border-white/5 bg-white/[0.012] backdrop-blur-[2px] p-8 text-center"
           >
             <p
               className="font-['Oswald'] text-white/40 tracking-wide mb-4"
