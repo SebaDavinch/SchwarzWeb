@@ -14,11 +14,23 @@ import {
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { Link } from "react-router";
 import { GlitchText } from "../components/GlitchText";
-import { useAdminData } from "../hooks/useAdminData";
+import { useAdminData, type Leadership } from "../hooks/useAdminData";
 import { EditablePageSection } from "../components/EditablePageSection";
 
-const heroBg =
+const pausedHeroBg =
   "https://images.unsplash.com/photo-1770174078859-39c33402d078?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldCUyMHJlbGF4aW5nJTIwdmFjYXRpb24lMjBwYWxtJTIwdHJlZXN8ZW58MXx8fHwxNzcyMzE0ODA5fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral";
+const cityHeroBg =
+  "https://images.unsplash.com/photo-1768286868224-4f9375c29913?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkYXJrJTIwdXJiYW4lMjBza3lsaW5lJTIwbmlnaHQlMjBtb29keXxlbnwxfHx8fDE3NzIwMzY0MTJ8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral";
+const metroHeroBg =
+  "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?auto=format&fit=crop&q=80&w=1600";
+const sheriffHeroBg =
+  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&q=80&w=1600";
+const fibHeroBg =
+  "https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&q=80&w=1600";
+const emsHeroBg =
+  "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&q=80&w=1600";
+const weazelHeroBg =
+  "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&q=80&w=1600";
 
 const activities = [
   {
@@ -38,6 +50,158 @@ const activities = [
   },
 ];
 
+type LeadershipHeroPreset = {
+  key: string;
+  match: RegExp;
+  background: string;
+  alt: string;
+  accentColor: string;
+  watermark: string;
+  imageClassName: string;
+  overlayClassName: string;
+  primaryGlowClassName: string;
+  secondaryGlowClassName: string;
+  chips: Array<{ label: string; tone: string }>;
+  description: (leadership: Leadership) => string;
+};
+
+const leadershipHeroPresets: LeadershipHeroPreset[] = [
+  {
+    key: "lspd",
+    match: /(^|\b)lspd\b|los santos police/i,
+    background: metroHeroBg,
+    alt: "LSPD city patrol",
+    accentColor: "#3b82f6",
+    watermark: "LSPD",
+    imageClassName: "object-center opacity-30 scale-[1.05]",
+    overlayClassName: "bg-[linear-gradient(120deg,rgba(14,116,144,0.32)_0%,transparent_38%,transparent_62%,rgba(220,38,38,0.24)_100%)]",
+    primaryGlowClassName: "absolute top-[14%] left-[8%] w-[240px] h-[240px] rounded-full blur-[140px] bg-[#38bdf8]/20",
+    secondaryGlowClassName: "absolute bottom-[8%] right-[10%] w-[260px] h-[260px] rounded-full blur-[140px] bg-[#ef4444]/16",
+    chips: [
+      { label: "Metro Patrol", tone: "#93c5fd" },
+      { label: "Code Blue", tone: "#e2e8f0" },
+      { label: "Hot Pursuit", tone: "#fca5a5" },
+    ],
+    description: (leadership) =>
+      `Schwarz Family держит ${leadership.faction} на сервере ${leadership.server}. Городской патруль, ночные погони и жёсткий контроль улиц Los Santos.`,
+  },
+  {
+    key: "lssd",
+    match: /(^|\b)lssd\b|los santos sheriff/i,
+    background: sheriffHeroBg,
+    alt: "LSSD county roads",
+    accentColor: "#f59e0b",
+    watermark: "LSSD",
+    imageClassName: "object-center opacity-28 scale-[1.06]",
+    overlayClassName: "bg-[linear-gradient(120deg,rgba(245,158,11,0.26)_0%,transparent_36%,transparent_64%,rgba(120,53,15,0.24)_100%)]",
+    primaryGlowClassName: "absolute top-[18%] left-[12%] w-[260px] h-[260px] rounded-full blur-[150px] bg-[#f59e0b]/18",
+    secondaryGlowClassName: "absolute bottom-[10%] right-[10%] w-[250px] h-[250px] rounded-full blur-[140px] bg-[#fb923c]/14",
+    chips: [
+      { label: "County Watch", tone: "#fdba74" },
+      { label: "Highway Unit", tone: "#fde68a" },
+      { label: "Desert Shift", tone: "#fef3c7" },
+    ],
+    description: (leadership) =>
+      `Schwarz Family ведёт ${leadership.faction} на сервере ${leadership.server}. Трассы, округ Блейн, перехваты на хайвеях и плотная sheriff-атмосфера без передышки.`,
+  },
+  {
+    key: "fib",
+    match: /(^|\b)fib\b|federal investigation bureau/i,
+    background: fibHeroBg,
+    alt: "FIB night operations",
+    accentColor: "#8b5cf6",
+    watermark: "FIB",
+    imageClassName: "object-center opacity-30 scale-[1.06]",
+    overlayClassName: "bg-[linear-gradient(115deg,rgba(35,71,132,0.28)_0%,transparent_38%,transparent_62%,rgba(124,24,38,0.34)_100%)]",
+    primaryGlowClassName: "absolute top-[16%] left-[10%] w-[260px] h-[260px] rounded-full blur-[150px] bg-[#3b82f6]/20",
+    secondaryGlowClassName: "absolute bottom-[8%] right-[10%] w-[280px] h-[280px] rounded-full blur-[150px] bg-[#ef4444]/20",
+    chips: [
+      { label: "Night Ops", tone: "#93c5fd" },
+      { label: "Pursuit Mode", tone: "#fca5a5" },
+      { label: "Case Files", tone: "#e2e8f0" },
+    ],
+    description: (leadership) =>
+      `Schwarz Family держит ${leadership.faction} на сервере ${leadership.server}. Ночные выезды, перехваты и плотный оперативный темп без пауз.`,
+  },
+  {
+    key: "sang",
+    match: /(^|\b)sang\b|national guard|army|san andreas national guard/i,
+    background: cityHeroBg,
+    alt: "SANG tactical command",
+    accentColor: "#22c55e",
+    watermark: "SANG",
+    imageClassName: "object-center opacity-25 scale-[1.04]",
+    overlayClassName: "bg-[linear-gradient(120deg,rgba(34,197,94,0.24)_0%,transparent_34%,transparent_66%,rgba(234,179,8,0.16)_100%)]",
+    primaryGlowClassName: "absolute top-[15%] left-[10%] w-[250px] h-[250px] rounded-full blur-[150px] bg-[#22c55e]/18",
+    secondaryGlowClassName: "absolute bottom-[10%] right-[10%] w-[260px] h-[260px] rounded-full blur-[140px] bg-[#eab308]/12",
+    chips: [
+      { label: "Command Post", tone: "#86efac" },
+      { label: "Rapid Response", tone: "#d9f99d" },
+      { label: "Field Briefing", tone: "#fef08a" },
+    ],
+    description: (leadership) =>
+      `Schwarz Family ведёт ${leadership.faction} на сервере ${leadership.server}. Военный ритм, дисциплина, колонны и постоянная готовность к развёртыванию.`,
+  },
+  {
+    key: "ems",
+    match: /(^|\b)ems\b|emergency medical|hospital/i,
+    background: emsHeroBg,
+    alt: "EMS emergency response",
+    accentColor: "#ef4444",
+    watermark: "EMS",
+    imageClassName: "object-center opacity-24 scale-[1.05]",
+    overlayClassName: "bg-[linear-gradient(120deg,rgba(239,68,68,0.30)_0%,transparent_36%,transparent_64%,rgba(255,255,255,0.12)_100%)]",
+    primaryGlowClassName: "absolute top-[16%] left-[10%] w-[250px] h-[250px] rounded-full blur-[150px] bg-[#ef4444]/18",
+    secondaryGlowClassName: "absolute bottom-[10%] right-[10%] w-[240px] h-[240px] rounded-full blur-[140px] bg-[#fca5a5]/14",
+    chips: [
+      { label: "Emergency Call", tone: "#fca5a5" },
+      { label: "Red Zone", tone: "#fee2e2" },
+      { label: "Rapid Aid", tone: "#ffffff" },
+    ],
+    description: (leadership) =>
+      `Schwarz Family держит ${leadership.faction} на сервере ${leadership.server}. Экстренные вызовы, спасение под давлением и быстрый медицинский темп 24/7.`,
+  },
+  {
+    key: "weazel",
+    match: /weazel|news/i,
+    background: weazelHeroBg,
+    alt: "Weazel News newsroom",
+    accentColor: "#ff3366",
+    watermark: "NEWS",
+    imageClassName: "object-center opacity-22 scale-[1.04]",
+    overlayClassName: "bg-[linear-gradient(120deg,rgba(255,51,102,0.26)_0%,transparent_40%,transparent_64%,rgba(255,255,255,0.10)_100%)]",
+    primaryGlowClassName: "absolute top-[15%] left-[10%] w-[240px] h-[240px] rounded-full blur-[140px] bg-[#ff3366]/18",
+    secondaryGlowClassName: "absolute bottom-[10%] right-[10%] w-[250px] h-[250px] rounded-full blur-[140px] bg-[#f472b6]/14",
+    chips: [
+      { label: "Breaking News", tone: "#fda4af" },
+      { label: "Live Feed", tone: "#ffffff" },
+      { label: "Prime Time", tone: "#fecdd3" },
+    ],
+    description: (leadership) =>
+      `Schwarz Family ведёт ${leadership.faction} на сервере ${leadership.server}. Репортажи, прямые эфиры, инфоповоды и круглосуточный медиашум вокруг семьи.`,
+  },
+];
+
+const defaultLeadershipPreset: LeadershipHeroPreset = {
+  key: "default",
+  match: /.*/,
+  background: cityHeroBg,
+  alt: "Leadership night skyline",
+  accentColor: "#9b2335",
+  watermark: "LEAD",
+  imageClassName: "object-center opacity-24 scale-[1.03]",
+  overlayClassName: "bg-[linear-gradient(120deg,rgba(155,35,53,0.24)_0%,transparent_38%,transparent_66%,rgba(255,255,255,0.08)_100%)]",
+  primaryGlowClassName: "absolute top-[15%] left-[10%] w-[240px] h-[240px] rounded-full blur-[150px] bg-[#9b2335]/18",
+  secondaryGlowClassName: "absolute bottom-[10%] right-[10%] w-[250px] h-[250px] rounded-full blur-[140px] bg-[#ffffff]/8",
+  chips: [
+    { label: "Leadership", tone: "#fbcfe8" },
+    { label: "Prime Status", tone: "#fde68a" },
+    { label: "Schwarz Family", tone: "#ffffff" },
+  ],
+  description: (leadership) =>
+    `Schwarz Family держит лидерку ${leadership.faction} на сервере ${leadership.server}. Активная фаза, полный контроль и готовность держать темп до конца срока.`,
+};
+
 function formatDate(dateStr: string) {
   if (!dateStr) return "-";
   try {
@@ -49,8 +213,14 @@ function formatDate(dateStr: string) {
   }
 }
 
+function getLeadershipHeroPreset(faction?: string | null) {
+  if (!faction) return defaultLeadershipPreset;
+  return leadershipHeroPresets.find((preset) => preset.match.test(faction)) ?? defaultLeadershipPreset;
+}
+
 export function CurrentLeadershipPage() {
   const { getPageOverride, activeLeadership } = useAdminData();
+  const heroPreset = getLeadershipHeroPreset(activeLeadership?.faction);
 
   const heroTitle =
     getPageOverride("current-leadership", "hero_title") ??
@@ -59,7 +229,7 @@ export function CurrentLeadershipPage() {
   const heroDesc =
     getPageOverride("current-leadership", "hero_desc") ??
     (activeLeadership
-      ? `Schwarz Family держит лидерку ${activeLeadership.faction} на сервере ${activeLeadership.server}.`
+      ? heroPreset.description(activeLeadership)
       : "Активной лидерки сейчас нет. Семья на паузе - отдыхаем, набираемся сил и готовимся к следующей главе.");
   const statusLabel =
     getPageOverride("current-leadership", "status_label") ??
@@ -69,7 +239,8 @@ export function CurrentLeadershipPage() {
   const activitiesDesc =
     getPageOverride("current-leadership", "activities_desc") ?? "Чем заняты";
 
-  const accentColor = activeLeadership?.color ?? "#f59e0b";
+  const accentColor = activeLeadership ? heroPreset.accentColor ?? activeLeadership.color : "#f59e0b";
+  const heroBg = activeLeadership ? heroPreset.background : pausedHeroBg;
 
   return (
     <div className="pt-16">
@@ -77,11 +248,34 @@ export function CurrentLeadershipPage() {
       <div className="relative h-[50vh] min-h-[400px] flex items-center justify-center overflow-hidden">
         <ImageWithFallback
           src={heroBg}
-          alt="Vacation"
-          className="absolute inset-0 w-full h-full object-cover opacity-15"
+          alt={activeLeadership ? heroPreset.alt : "Vacation"}
+          className={`absolute inset-0 w-full h-full object-cover ${activeLeadership ? heroPreset.imageClassName : "object-center opacity-15"}`}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f] via-transparent to-[#0a0a0f]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0f]/70 via-transparent to-[#0a0a0f]/70" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f] via-[#0a0a0f]/40 to-[#0a0a0f]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0f]/80 via-[#0a0a0f]/25 to-[#0a0a0f]/80" />
+        {activeLeadership && (
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(135deg, ${accentColor}1a 0%, transparent 30%, transparent 70%, ${accentColor}14 100%)`,
+            }}
+          />
+        )}
+        {activeLeadership && (
+          <>
+            <div className={`absolute inset-0 ${heroPreset.overlayClassName}`} />
+            <div className={heroPreset.primaryGlowClassName} />
+            <div className={heroPreset.secondaryGlowClassName} />
+            <div className="absolute inset-x-0 bottom-2 flex justify-center pointer-events-none overflow-hidden">
+              <span
+                className="font-['Russo_One'] text-white/[0.05] tracking-[0.25em] select-none whitespace-nowrap"
+                style={{ fontSize: "clamp(4rem, 14vw, 10rem)" }}
+              >
+                {heroPreset.watermark}
+              </span>
+            </div>
+          </>
+        )}
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] blur-[200px] rounded-full"
           style={{ background: `${accentColor}08` }}
@@ -158,6 +352,29 @@ export function CurrentLeadershipPage() {
               {statusLabel}
             </span>
           </motion.div>
+
+          {activeLeadership && heroPreset.chips.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.85, duration: 0.4 }}
+              className="mt-4 flex flex-wrap items-center justify-center gap-2"
+            >
+              {heroPreset.chips.map((item) => (
+                <span
+                  key={item.label}
+                  className="px-3 py-1 border bg-white/[0.04] backdrop-blur-sm font-['Oswald'] uppercase tracking-[0.2em]"
+                  style={{
+                    fontSize: "0.62rem",
+                    color: item.tone,
+                    borderColor: `${item.tone}33`,
+                  }}
+                >
+                  {item.label}
+                </span>
+              ))}
+            </motion.div>
+          )}
         </div>
       </div>
 
