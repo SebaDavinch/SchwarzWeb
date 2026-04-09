@@ -1107,7 +1107,17 @@ app.put("/api/user-achievements", (req, res) => {
 
 // Serve built frontend (production)
 if (fs.existsSync(DIST_DIR)) {
-  app.use(express.static(DIST_DIR));
+  app.use(express.static(DIST_DIR, {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
+        res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+      } else if (filePath.endsWith(".css")) {
+        res.setHeader("Content-Type", "text/css; charset=utf-8");
+      } else if (filePath.endsWith(".html")) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+      }
+    },
+  }));
   // SPA fallback — serve index.html for any non-API route
   app.get(/^(?!\/api).*/, (_req, res) => {
     res.sendFile(path.join(DIST_DIR, "index.html"));
